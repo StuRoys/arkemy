@@ -134,7 +134,7 @@ def validate_schema(df: pd.DataFrame, schema_type: str = "main") -> Dict[str, An
                     for idx, value in df[column].items():
                         try:
                             pd.to_datetime(value)
-                        except:
+                        except (ValueError, TypeError):
                             problematic_rows.append((idx, value))
                     
                     if problematic_rows:
@@ -153,7 +153,7 @@ def validate_schema(df: pd.DataFrame, schema_type: str = "main") -> Dict[str, An
                     for idx, value in df[column].items():
                         try:
                             float(value)
-                        except:
+                        except (ValueError, TypeError):
                             problematic_rows.append((idx, value))
                     
                     if problematic_rows:
@@ -176,7 +176,7 @@ def validate_schema(df: pd.DataFrame, schema_type: str = "main") -> Dict[str, An
                 for idx, value in df[column].items():
                     try:
                         pd.to_datetime(value)
-                    except:
+                    except (ValueError, TypeError):
                         problematic_rows.append((idx, value))
                 
                 if problematic_rows:
@@ -195,7 +195,7 @@ def validate_schema(df: pd.DataFrame, schema_type: str = "main") -> Dict[str, An
                 for idx, value in df[column].items():
                     try:
                         float(value)
-                    except:
+                    except (ValueError, TypeError):
                         problematic_rows.append((idx, value))
                 
                 if problematic_rows:

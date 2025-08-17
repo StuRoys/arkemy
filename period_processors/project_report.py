@@ -74,13 +74,13 @@ def render_project_table(df):
     
     # Translation mapping for columns
     translation_mapping = {
-        "Project ID": t("project_id") if "project_id" in st.session_state.translations else "Project ID",
-        "Project Name": t("project_name") if "project_name" in st.session_state.translations else "Project Name",
-        "Period": t("period_label") if "period_label" in st.session_state.translations else "Period",
-        "Period Hours": t("period_hours") if "period_hours" in st.session_state.translations else "Period Hours",
+        "Project ID": t("project_id"),
+        "Project Name": t("project_name"),
+        "Period": t("period_label"),
+        "Period Hours": t("period_hours"),
         "Planned Hours": t("planned_hours"),
-        "Period Fees": t("period_fees") if "period_fees" in st.session_state.translations else "Period Fees",
-        "Planned Income": t("planned_income") if "planned_income" in st.session_state.translations else "Planned Income",
+        "Period Fees": t("period_fees"),
+        "Planned Income": t("planned_income"),
    }
     
     # Create a display copy with translated column names
@@ -113,8 +113,7 @@ def render_project_period_filters(df):
     # Period filter options
     period_filter = st.sidebar.radio(
         t('period'), 
-        [t('month'), t('quarters'), t('year')],
-        horizontal=True,
+        [t('month'), t('quarters'), t('year_so_far'), t('year')],
         key='project_period_filter',
     )
     
@@ -132,11 +131,17 @@ def render_project_period_filters(df):
         if current_year in years:
             year_default_index = years.index(current_year)
         
-        selected_year = st.sidebar.selectbox(
-            t('select_year'), 
-            years,
-            index=year_default_index
-        )
+        # Create two columns for year and month selection
+        year_col, month_col = st.sidebar.columns(2)
+        
+        # Year selection
+        with year_col:
+            selected_year = st.selectbox(
+                t('select_year'), 
+                years,
+                index=year_default_index,
+                key='month_year'
+            )
         
         # Get available months for the selected year only
         year_data = df[df["Period"].dt.year == selected_year]
@@ -166,11 +171,14 @@ def render_project_period_filters(df):
         if default_month_num in available_month_numbers:
             default_month_index = available_month_numbers.index(default_month_num)
         
-        selected_month_name = st.sidebar.selectbox(
-            t('select_month'),
-            available_month_names,
-            index=default_month_index
-        )
+        # Month selection
+        with month_col:
+            selected_month_name = st.selectbox(
+                t('select_month'),
+                available_month_names,
+                index=default_month_index,
+                key='month_month'
+            )
         
         # Convert month name back to number for filtering
         selected_month_num = available_month_numbers[available_month_names.index(selected_month_name)]
@@ -180,12 +188,19 @@ def render_project_period_filters(df):
     
     elif period_filter == t('quarters'):
         # Get list of years in the data
-        years = sorted(df["Period"].dt.year.unique())
-        selected_year = st.sidebar.selectbox(t('select_year'), years)
+        years = sorted(df["Period"].dt.year.unique(), reverse=True)
+        
+        # Create two columns for year and quarter selection
+        year_col, quarter_col = st.sidebar.columns(2)
+        
+        # Year selection
+        with year_col:
+            selected_year = st.selectbox(t('select_year'), years, key='quarter_year')
         
         # Quarter selection
-        quarters = [t('q1'), t('q2'), t('q3'), t('q4')]
-        selected_quarter = st.sidebar.selectbox(t('select_quarter'), quarters)
+        with quarter_col:
+            quarters = [t('q1'), t('q2'), t('q3'), t('q4')]
+            selected_quarter = st.selectbox(t('select_quarter'), quarters, key='quarter_quarter')
         
         # Determine quarter number
         quarter_num = quarters.index(selected_quarter) + 1
@@ -208,6 +223,72 @@ def render_project_period_filters(df):
             index=default_index
         )
         filter_params['year'] = selected_year
+    
+    elif period_filter == t('year_so_far'):
+        from datetime import datetime
+        
+        # Always use current year for "Year so far"
+        current_year = datetime.now().year
+        selected_year = current_year
+        
+        # Get available months for the selected year (months with any data)
+        year_data = df[df["Period"].dt.year == selected_year]
+        available_months = sorted(year_data["Period"].dt.month.unique())
+        
+        # Find the last month with actual worked data for default
+        if "Period Hours" in year_data.columns:
+            actual_work_data = year_data[year_data["Period Hours"] > 0]
+            if not actual_work_data.empty:
+                default_to_month = actual_work_data["Period"].dt.month.max()
+            else:
+                default_to_month = available_months[-1] if available_months else 12
+        else:
+            default_to_month = available_months[-1] if available_months else 12
+        
+        # Create month names for available months
+        month_keys = ['january', 'february', 'march', 'april', 'may', 'june', 
+                     'july', 'august', 'september', 'october', 'november', 'december']
+        
+        available_month_names = []
+        available_month_numbers = []
+        for month_num in available_months:
+            month_key = month_keys[month_num - 1]
+            month_name = t(month_key)
+            available_month_names.append(month_name)
+            available_month_numbers.append(month_num)
+        
+        # Create two columns for from/to month selection
+        from_col, to_col = st.sidebar.columns(2)
+        
+        # From month dropdown
+        with from_col:
+            from_month_index = 0  # Default to first available month (typically January)
+            from_month_name = st.selectbox(
+                t('from_month'),
+                available_month_names,
+                index=from_month_index,
+                key='ysf_from_month'
+            )
+            from_month_num = available_month_numbers[available_month_names.index(from_month_name)]
+        
+        # To month dropdown  
+        with to_col:
+            # Default to last month with actual data
+            to_month_index = len(available_month_names) - 1
+            if default_to_month in available_month_numbers:
+                to_month_index = available_month_numbers.index(default_to_month)
+            
+            to_month_name = st.selectbox(
+                t('to_month'),
+                available_month_names,
+                index=to_month_index,
+                key='ysf_to_month'
+            )
+            to_month_num = available_month_numbers[available_month_names.index(to_month_name)]
+        
+        filter_params['year'] = selected_year
+        filter_params['from_month'] = from_month_num
+        filter_params['to_month'] = to_month_num
     
     return filter_params
 
@@ -251,6 +332,19 @@ def apply_project_period_filter(df, filter_params):
             filtered_df = filtered_df[filtered_df["Period"].dt.year == selected_year]
             filtered_period_info['year'] = selected_year
     
+    elif filter_type == t('year_so_far'):
+        selected_year = filter_params.get('year')
+        from_month = filter_params.get('from_month')
+        to_month = filter_params.get('to_month')
+        if selected_year and from_month and to_month:
+            # Filter for selected year and month range
+            year_filter = filtered_df["Period"].dt.year == selected_year
+            month_filter = (filtered_df["Period"].dt.month >= from_month) & (filtered_df["Period"].dt.month <= to_month)
+            filtered_df = filtered_df[year_filter & month_filter]
+            filtered_period_info['year'] = selected_year
+            filtered_period_info['from_month'] = from_month
+            filtered_period_info['to_month'] = to_month
+    
     return filtered_df, filtered_period_info
 
 def render_project_sidebar_filters(df):
@@ -266,17 +360,88 @@ def render_project_sidebar_filters(df):
     filtered_period_info = {}
     
     # Create a container for filter controls
-    st.sidebar.header(t('filter_data') if 'filter_data' in st.session_state.translations else "Filter Data")
     
-    # Period filter in an expander
-    with st.sidebar.expander(t('filter_period_header') if 'filter_period_header' in st.session_state.translations else "Period Filter", expanded=True):
-        # Use the new clean period filter function
-        period_filter_params = render_project_period_filters(filtered_df)
-        filtered_df, filtered_period_info = apply_project_period_filter(filtered_df, period_filter_params)
+    # Period filter (renders directly to sidebar)
+    period_filter_params = render_project_period_filters(filtered_df)
+    filtered_df, filtered_period_info = apply_project_period_filter(filtered_df, period_filter_params)
     
-    # Created date filtering
+    # Project selection (1st filter)
+    with st.sidebar.expander(t('filter_project_name_header'), expanded=True):
+        # Initialize session state
+        all_projects_option = t('filter_all_projects')
+        if 'selected_project' not in st.session_state:
+            st.session_state.selected_project = all_projects_option
+        
+        unique_projects = filtered_df["Project Name"].unique()
+        # Convert all project names to strings to avoid comparison errors
+        unique_projects_str = sorted([str(p) for p in unique_projects])
+        
+        # Project inclusion filter (multiselect for multiple projects)
+        included_projects = st.multiselect(
+            t("filter_select_project"),
+            options=unique_projects_str,
+            help="Select specific projects to include in visualization",
+            key="included_projects"
+        )
+        
+        # Project exclusion filter
+        excluded_projects = st.multiselect(
+            t("filter_exclude_projects"),
+            options=unique_projects_str,
+            help=t("filter_exclude_projects_help"),
+            key="excluded_projects"
+        )
+
+        # Apply filtering logic
+        if included_projects:
+            # If specific projects are included, filter to only those
+            filtered_df = filtered_df[filtered_df["Project Name"].astype(str).isin(included_projects)]
+        
+        if excluded_projects:
+            # Remove excluded projects
+            filtered_df = filtered_df[~filtered_df["Project Name"].astype(str).isin(excluded_projects)]
+        
+        # For compatibility with existing code, return the "All Projects" option if no specific projects selected
+        selected_project = all_projects_option if not included_projects else included_projects[0] if len(included_projects) == 1 else "Multiple Projects"
+    
+    # Project type filtering (2nd filter)
+    if "Project type" in filtered_df.columns:
+        with st.sidebar.expander(t('filter_project_type_header')):
+            # Get unique project types
+            unique_project_types = sorted(filtered_df["Project type"].dropna().unique().tolist())
+            
+            # Include dropdown (single column layout)
+            include_types = st.multiselect(
+                t('filter_include_types'),
+                options=unique_project_types,
+                help=t('filter_include_types_help')
+            )
+            
+            # Exclude dropdown (single column layout)
+            # Filter out types that are already in the include list to avoid conflicts
+            exclude_options = [t for t in unique_project_types if t not in include_types]
+            exclude_types = st.multiselect(
+                t('filter_exclude_types'),
+                options=exclude_options,
+                help=t('filter_exclude_types_help')
+            )
+            
+            # Apply filters
+            if include_types:
+                # Include only selected project types
+                filtered_df = filtered_df[filtered_df["Project type"].isin(include_types)]
+            
+            if exclude_types:
+                # Exclude selected project types
+                filtered_df = filtered_df[~filtered_df["Project type"].isin(exclude_types)]
+            
+            # Show how many projects match the filters
+            if include_types or exclude_types:
+                st.info(f"{len(filtered_df['Project Name'].unique())} {t('filter_projects_match')}")
+    
+    # Created date filtering (3rd filter)
     if "Created" in filtered_df.columns:
-        with st.sidebar.expander(t('filter_created_header') if 'filter_created_header' in st.session_state.translations else "Project Created"):
+        with st.sidebar.expander(t('filter_created_header')):
             try:
                 # Convert Created column to datetime
                 filtered_df["Created"] = pd.to_datetime(filtered_df["Created"], errors='coerce')
@@ -291,14 +456,14 @@ def render_project_sidebar_filters(df):
                 # Start date picker
                 with start_col:
                     start_date = st.date_input(
-                        t('filter_start_date') if 'filter_start_date' in st.session_state.translations else "Start Date",
+                        t('filter_start_date'),
                         value=min_creation_date
                     )
                 
                 # End date picker
                 with end_col:
                     end_date = st.date_input(
-                        t('filter_end_date') if 'filter_end_date' in st.session_state.translations else "End Date",
+                        t('filter_end_date'),
                         value=max_creation_date
                     )
                 
@@ -311,102 +476,9 @@ def render_project_sidebar_filters(df):
                 # Filter the dataframe to only include these projects
                 filtered_df = filtered_df[filtered_df["Project Name"].isin(valid_projects)]
                 
-                st.info(f"{t('filter_showing_projects') if 'filter_showing_projects' in st.session_state.translations else 'Showing'} {len(valid_projects)} {t('filter_projects_created_between') if 'filter_projects_created_between' in st.session_state.translations else 'projects created between'} {start_date} {t('filter_and') if 'filter_and' in st.session_state.translations else 'and'} {end_date}")
+                st.info(f"{t('filter_showing_projects')} {len(valid_projects)} {t('filter_projects_created_between')} {start_date} {t('filter_and')} {end_date}")
             except Exception as e:
-                st.warning(f"{t('filter_creation_date_error') if 'filter_creation_date_error' in st.session_state.translations else 'Error applying creation date filter:'} {str(e)}")
-    
-    # Project type filtering
-    if "Project type" in filtered_df.columns:
-        with st.sidebar.expander(t('filter_project_type_header') if 'filter_project_type_header' in st.session_state.translations else "Project Type"):
-            # Get unique project types
-            unique_project_types = sorted(filtered_df["Project type"].dropna().unique().tolist())
-            
-            # Create two columns for include and exclude
-            include_col, exclude_col = st.columns(2)
-            
-            # Include dropdown
-            with include_col:
-                include_types = st.multiselect(
-                    t('filter_include_types') if 'filter_include_types' in st.session_state.translations else "Include Types",
-                    options=unique_project_types,
-                    help=t('filter_include_types_help') if 'filter_include_types_help' in st.session_state.translations else "Only show projects of these types"
-                )
-            
-            # Exclude dropdown
-            with exclude_col:
-                # Filter out types that are already in the include list to avoid conflicts
-                exclude_options = [t for t in unique_project_types if t not in include_types]
-                exclude_types = st.multiselect(
-                    t('filter_exclude_types') if 'filter_exclude_types' in st.session_state.translations else "Exclude Types",
-                    options=exclude_options,
-                    help=t('filter_exclude_types_help') if 'filter_exclude_types_help' in st.session_state.translations else "Hide projects of these types"
-                )
-            
-            # Apply filters
-            if include_types:
-                # Include only selected project types
-                filtered_df = filtered_df[filtered_df["Project type"].isin(include_types)]
-            
-            if exclude_types:
-                # Exclude selected project types
-                filtered_df = filtered_df[~filtered_df["Project type"].isin(exclude_types)]
-            
-            # Show how many projects match the filters
-            if include_types or exclude_types:
-                st.info(f"{len(filtered_df['Project Name'].unique())} {t('filter_projects_match') if 'filter_projects_match' in st.session_state.translations else 'projects match your filters'}")
-    
-    # Project selection
-    with st.sidebar.expander(t('filter_project_name_header') if 'filter_project_name_header' in st.session_state.translations else "Project Name", expanded=True):
-        # Initialize session state
-        all_projects_option = t('filter_all_projects') if 'filter_all_projects' in st.session_state.translations else "All Projects"
-        if 'selected_project' not in st.session_state:
-            st.session_state.selected_project = all_projects_option
-        
-        unique_projects = filtered_df["Project Name"].unique()
-        # Convert all project names to strings to avoid comparison errors
-        unique_projects_str = sorted([str(p) for p in unique_projects])
-        
-        # Create two columns for selection and exclusion
-        select_col, exclude_col = st.columns(2)
-        
-        # Project exclusion filter (handle this FIRST)
-        with exclude_col:
-            excluded_projects = st.multiselect(
-                t("filter_exclude_projects") if "filter_exclude_projects" in st.session_state.translations else "Exclude",
-                options=unique_projects_str,
-                help=t("filter_exclude_projects_help") if "filter_exclude_projects_help" in st.session_state.translations else "Projects to exclude from visualization",
-                key="excluded_projects"
-            )
-
-        # Apply exclusion filtering to dataframe
-        if excluded_projects:
-            filtered_df = filtered_df[~filtered_df["Project Name"].astype(str).isin(excluded_projects)]
-            # Update available projects after exclusion
-            remaining_projects = filtered_df["Project Name"].unique()
-            remaining_projects_str = sorted([str(p) for p in remaining_projects])
-        else:
-            remaining_projects_str = unique_projects_str
-
-        # Create project list for selectbox (after exclusions applied)
-        project_list = [all_projects_option] + remaining_projects_str
-
-        # Validate current selection - if selected project was excluded, reset to All Projects
-        if st.session_state.selected_project not in project_list:
-            st.session_state.selected_project = all_projects_option
-            
-        # Find the proper index for the selectbox
-        selected_index = 0
-        if st.session_state.selected_project in project_list:
-            selected_index = project_list.index(st.session_state.selected_project)
-
-        # Create project selection dropdown
-        with select_col:
-            selected_project = st.selectbox(
-                t("filter_select_project") if "filter_select_project" in st.session_state.translations else "Select Project",
-                project_list,
-                index=selected_index,
-                key="selected_project"  # Use same key as session state
-            )
+                st.warning(f"{t('filter_creation_date_error')} {str(e)}")
     
     return filtered_df, filtered_period_info, selected_project
 
@@ -454,7 +526,7 @@ def handle_project_upload():
     missing_columns = [col for col in project_columns if col not in project_df.columns]
     
     if missing_columns:
-        st.warning(f"{t('filter_missing_columns') if 'filter_missing_columns' in st.session_state.translations else 'Missing columns:'} {', '.join(missing_columns)}")
+        st.warning(f"{t('filter_missing_columns')} {', '.join(missing_columns)}")
         st.info(t('filter_upload_correct_csv') if 'filter_upload_correct_csv' in st.session_state.translations 
                else "Please upload a CSV with the correct data structure.")
         return
@@ -470,7 +542,7 @@ def handle_project_upload():
                 # Create a dummy Period column with the current date to avoid errors
                 project_df["Period"] = pd.Timestamp.now()
         except Exception as e:
-            st.warning(f"{t('filter_period_error') if 'filter_period_error' in st.session_state.translations else 'Could not convert Period to datetime:'} {str(e)}")
+            st.warning(f"{t('filter_period_error')} {str(e)}")
             # Create a dummy Period column with the current date to avoid errors
             project_df["Period"] = pd.Timestamp.now()
 
@@ -478,15 +550,14 @@ def handle_project_upload():
     filtered_df, filtered_period_info, selected_project = render_project_sidebar_filters(project_df)
     
     # Create tabs for different views
-    hours_tab, fees_tab, rate_tab, data_tab = st.tabs([
-        t("hours_project") if "hours_project" in st.session_state.translations else "Project Hours",
-        t("fees_project") if "fees_project" in st.session_state.translations else "Project fees",
-        t("rate_project") if "rate_project" in st.session_state.translations else "Project rate",
-        t("data")
+    hours_tab, fees_tab, rate_tab = st.tabs([
+        t("hours_project"),
+        t("fees_project"),
+        t("rate_project")
     ])
     
     # Get the translated "All Projects" option once
-    all_projects_option = t('filter_all_projects') if 'filter_all_projects' in st.session_state.translations else "All Projects"
+    all_projects_option = t('filter_all_projects')
     
     with hours_tab:
         st.header(t("project_hours_chart") if "project_hours_chart" in st.session_state.translations 
@@ -502,39 +573,3 @@ def handle_project_upload():
         st.header(t("project_rate_chart") if "project_rate_chart" in st.session_state.translations 
                 else "Project Rate")
         render_project_rate_chart(filtered_df, selected_project, all_projects_option)
-    
-    with data_tab:
-        st.header(t("project_data") if "project_data" in st.session_state.translations else "Project Data")
-        
-        # Filter the dataframe by selected project if not "All Projects"
-        all_projects_option = t('filter_all_projects') if 'filter_all_projects' in st.session_state.translations else "All Projects"
-        if selected_project != all_projects_option:
-            display_df = filtered_df[filtered_df["Project Name"].astype(str) == selected_project]
-        else:
-            display_df = filtered_df
-        
-        # Create three dataframe displays
-        st.subheader("Monthly")
-        monthly_df = display_df.groupby(pd.to_datetime(display_df["Period"]).dt.to_period('M')).agg({
-            "Period Hours": "sum",
-            "Planned Hours": "sum", 
-            "Period Fees": "sum",
-            "Planned Income": "sum"
-        }).reset_index()
-        monthly_df["Period"] = monthly_df["Period"].dt.to_timestamp()
-        render_project_table(monthly_df)
-        
-        st.subheader("Project")
-        project_df = display_df.groupby(["Project ID", "Project Name"]).agg({
-            "Period Hours": "sum",
-            "Planned Hours": "sum",
-            "Period Fees": "sum", 
-            "Planned Income": "sum"
-        }).reset_index()
-        # Add Period column for consistency
-        project_df["Period"] = "All Periods"
-        render_project_table(project_df)
-        
-        st.subheader("Project per Month")
-        project_per_month_df = create_project_per_month_table(display_df)
-        render_project_table(project_per_month_df)

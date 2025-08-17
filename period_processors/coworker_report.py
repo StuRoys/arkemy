@@ -92,6 +92,19 @@ def apply_period_filter(df, filter_type, filter_params):
             filtered_df = filtered_df[filtered_df["Period"].dt.year == selected_year]
             filtered_period_info['year'] = selected_year
     
+    elif filter_type == t('year_so_far'):
+        selected_year = filter_params.get('year')
+        from_month = filter_params.get('from_month')
+        to_month = filter_params.get('to_month')
+        if selected_year and from_month and to_month:
+            # Filter for selected year and month range
+            year_filter = filtered_df["Period"].dt.year == selected_year
+            month_filter = (filtered_df["Period"].dt.month >= from_month) & (filtered_df["Period"].dt.month <= to_month)
+            filtered_df = filtered_df[year_filter & month_filter]
+            filtered_period_info['year'] = selected_year
+            filtered_period_info['from_month'] = from_month
+            filtered_period_info['to_month'] = to_month
+    
     return filtered_df, filtered_period_info
 
 def render_sidebar_filters(df=None):
@@ -116,14 +129,12 @@ def render_sidebar_filters(df=None):
     max_date = df["Period"].max()
     
     # Create a container for filter controls
-    st.sidebar.header(t('filter_data'))
     
     # Period filter options
     period_filter = st.sidebar.radio(
         t('period'), 
-        [t('month'), t('quarters'), t('year')],
-        horizontal=True,
-        key='coworker_period',
+        [t('month'), t('quarters'), t('year_so_far'), t('year')],
+        key='coworker_period_filter',
     )
     
     filter_params = {'type': period_filter}
@@ -140,11 +151,17 @@ def render_sidebar_filters(df=None):
         if current_year in years:
             year_default_index = years.index(current_year)
         
-        selected_year = st.sidebar.selectbox(
-            t('select_year'), 
-            years,
-            index=year_default_index
-        )
+        # Create two columns for year and month selection
+        year_col, month_col = st.sidebar.columns(2)
+        
+        # Year selection
+        with year_col:
+            selected_year = st.selectbox(
+                t('select_year'), 
+                years,
+                index=year_default_index,
+                key='coworker_month_year'
+            )
         
         # Get available months for the selected year only
         year_data = df[df["Period"].dt.year == selected_year]
@@ -174,11 +191,14 @@ def render_sidebar_filters(df=None):
         if default_month_num in available_month_numbers:
             default_month_index = available_month_numbers.index(default_month_num)
         
-        selected_month_name = st.sidebar.selectbox(
-            t('select_month'),
-            available_month_names,
-            index=default_month_index
-        )
+        # Month selection
+        with month_col:
+            selected_month_name = st.selectbox(
+                t('select_month'),
+                available_month_names,
+                index=default_month_index,
+                key='coworker_month_month'
+            )
         
         # Convert month name back to number for filtering
         selected_month_num = available_month_numbers[available_month_names.index(selected_month_name)]
@@ -188,12 +208,19 @@ def render_sidebar_filters(df=None):
     
     elif period_filter == t('quarters'):
         # Get list of years in the data
-        years = sorted(df["Period"].dt.year.unique())
-        selected_year = st.sidebar.selectbox(t('select_year'), years)
+        years = sorted(df["Period"].dt.year.unique(), reverse=True)
+        
+        # Create two columns for year and quarter selection
+        year_col, quarter_col = st.sidebar.columns(2)
+        
+        # Year selection
+        with year_col:
+            selected_year = st.selectbox(t('select_year'), years, key='coworker_quarter_year')
         
         # Quarter selection
-        quarters = [t('q1'), t('q2'), t('q3'), t('q4')]
-        selected_quarter = st.sidebar.selectbox(t('select_quarter'), quarters)
+        with quarter_col:
+            quarters = [t('q1'), t('q2'), t('q3'), t('q4')]
+            selected_quarter = st.selectbox(t('select_quarter'), quarters, key='coworker_quarter_quarter')
         
         # Determine quarter number
         quarter_num = quarters.index(selected_quarter) + 1
@@ -205,15 +232,91 @@ def render_sidebar_filters(df=None):
         # Get list of years in the data
         years = sorted(df["Period"].dt.year.unique(), reverse=True)
         
-        # Default to most recent year
-        default_index = 0 if years else 0
+        # Default to 2025
+        default_index = 0
+        if 2025 in years:
+            default_index = years.index(2025)
         
         selected_year = st.sidebar.selectbox(
             t('select_year'), 
             years,
-            index=default_index
+            index=default_index,
+            key='coworker_year'
         )
         filter_params['year'] = selected_year
+    
+    elif period_filter == t('year_so_far'):
+        from datetime import datetime
+        
+        # Always use current year for "Year so far"
+        current_year = datetime.now().year
+        selected_year = current_year
+        
+        # Get available months for the selected year (months with any data)
+        year_data = df[df["Period"].dt.year == selected_year]
+        available_months = sorted(year_data["Period"].dt.month.unique())
+        
+        # Find the last month with actual worked data for default
+        # For coworker data, use 'Project hours' or 'Hours/Registered' as indicator
+        if "Project hours" in year_data.columns:
+            actual_work_data = year_data[year_data["Project hours"] > 0]
+            if not actual_work_data.empty:
+                default_to_month = actual_work_data["Period"].dt.month.max()
+            else:
+                default_to_month = available_months[-1] if available_months else 12
+        elif "Hours/Registered" in year_data.columns:
+            actual_work_data = year_data[year_data["Hours/Registered"] > 0]
+            if not actual_work_data.empty:
+                default_to_month = actual_work_data["Period"].dt.month.max()
+            else:
+                default_to_month = available_months[-1] if available_months else 12
+        else:
+            default_to_month = available_months[-1] if available_months else 12
+        
+        # Create month names for available months
+        month_keys = ['january', 'february', 'march', 'april', 'may', 'june', 
+                     'july', 'august', 'september', 'october', 'november', 'december']
+        
+        available_month_names = []
+        available_month_numbers = []
+        for month_num in available_months:
+            month_key = month_keys[month_num - 1]
+            month_name = t(month_key)
+            available_month_names.append(month_name)
+            available_month_numbers.append(month_num)
+        
+        # Create two columns for from/to month selection
+        from_col, to_col = st.sidebar.columns(2)
+        
+        # From month dropdown
+        with from_col:
+            from_month_index = 0  # Default to first available month (typically January)
+            from_month_name = st.selectbox(
+                t('from_month'),
+                available_month_names,
+                index=from_month_index,
+                key='coworker_ysf_from_month'
+            )
+            from_month_num = available_month_numbers[available_month_names.index(from_month_name)]
+        
+        # To month dropdown  
+        with to_col:
+            # Default to last month with actual data
+            to_month_index = len(available_month_names) - 1
+            if default_to_month in available_month_numbers:
+                to_month_index = available_month_numbers.index(default_to_month)
+            
+            to_month_name = st.selectbox(
+                t('to_month'),
+                available_month_names,
+                index=to_month_index,
+                key='coworker_ysf_to_month'
+            )
+            to_month_num = available_month_numbers[available_month_names.index(to_month_name)]
+        
+        filter_params['year'] = selected_year
+        filter_params['from_month'] = from_month_num
+        filter_params['to_month'] = to_month_num
     
     # Person selection
     if "Person" in df.columns:

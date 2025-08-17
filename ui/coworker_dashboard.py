@@ -83,11 +83,6 @@ def render_coworker_dashboard(transformed_df: pd.DataFrame,
         st.warning("No data matches the selected filters. Please adjust your filter criteria.")
         return
     
-    # Remove debug info for production
-    # st.write(f"Debug: Filtered data shape: {filtered_df.shape}, Selected person: {selected_person}")
-    # if not filtered_df.empty:
-    #     st.write(f"Debug: Available columns: {list(filtered_df.columns)}")
-    #     st.write(f"Debug: Unique persons in filtered data: {filtered_df['Person'].unique().tolist()}")
     
     # Main dashboard content
     render_coworker_summary(filtered_df, selected_person)

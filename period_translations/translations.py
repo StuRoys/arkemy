@@ -105,9 +105,8 @@ def initialize_translations():
     if 'language' not in st.session_state:
         st.session_state.language = 'en'
     
-    # Initialize translations if not already done
-    if 'translations' not in st.session_state:
-        st.session_state.translations = load_translations(st.session_state.language)
+    # Force reload translations (for development - remove in production)
+    st.session_state.translations = load_translations(st.session_state.language)
 
 # Shorthand function name for convenience
 def t(key):

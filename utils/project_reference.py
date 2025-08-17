@@ -130,7 +130,7 @@ def detect_column_type(df, column):
                     for sample in samples:
                         try:
                             pd.to_datetime(sample, format=fmt)
-                        except:
+                        except (ValueError, TypeError):
                             success = False
                             break
                     
@@ -138,7 +138,7 @@ def detect_column_type(df, column):
                         # If sample test passed, try the whole column
                         pd.to_datetime(non_null_values, format=fmt)
                         return 'date'
-                except:
+                except (ValueError, TypeError):
                     continue
             
             # If no specific format worked, try pandas' automatic detection
@@ -323,7 +323,7 @@ def get_dynamic_project_filters(df, reference_df):
                             filtered_df[f'{column}_datetime'] = pd.to_datetime(filtered_df[column], 
                                                                               format='%d.%m.%Y', 
                                                                               errors='coerce')
-                        except:
+                        except (ValueError, TypeError):
                             # If that fails, use automatic detection with dayfirst=True
                             filtered_df[f'{column}_datetime'] = pd.to_datetime(filtered_df[column], 
                                                                               dayfirst=True, 

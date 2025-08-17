@@ -49,52 +49,67 @@ def render_comparison_chart(df, selected_person, target_value=80):
         filtered_df["Billable vs Registered"] = (filtered_df["Project hours"] / filtered_df["Hours/Registered"] * 100).round(2)
         filtered_df["Non-billable vs Registered"] = (filtered_df["Unpaid work"] / filtered_df["Hours/Registered"] * 100).round(2) if "Unpaid work" in filtered_df.columns else pd.Series([0] * len(filtered_df))
     
+    # Calculate stacked chart data for Billable & Non-billable comparisons
+    if "Unpaid work" in filtered_df.columns:
+        # vs Capacity
+        filtered_df["Billable % of Capacity"] = (filtered_df["Project hours"] / filtered_df["Capacity/Period"] * 100).round(2)
+        filtered_df["Non-billable % of Capacity"] = (filtered_df["Unpaid work"] / filtered_df["Capacity/Period"] * 100).round(2)
+        
+        # vs Registered
+        if "Hours/Registered" in filtered_df.columns:
+            filtered_df["Billable % of Registered"] = (filtered_df["Project hours"] / filtered_df["Hours/Registered"] * 100).round(2)
+            filtered_df["Non-billable % of Registered"] = (filtered_df["Unpaid work"] / filtered_df["Hours/Registered"] * 100).round(2)
+        
+        # vs Schedule
+        if "Hours/Period" in filtered_df.columns:
+            filtered_df["Billable % of Schedule"] = (filtered_df["Project hours"] / filtered_df["Hours/Period"] * 100).round(2)
+            filtered_df["Non-billable % of Schedule"] = (filtered_df["Unpaid work"] / filtered_df["Hours/Period"] * 100).round(2)
+    
     # Create formatted period string for display
     filtered_df["Period_display"] = filtered_df["Period"].dt.strftime("%b %Y")
     
     # Create a dropdown for selecting which metric to display
     metric_options = {
-        "Billable Rate": "Billable vs Capacity",
-        "Registered vs Schedule": "Registered vs Schedule",
-        "Registered vs Capacity": "Registered vs Capacity",
-        "Billable vs Schedule": "Billable vs Schedule",
-        "Billable vs Capacity": "Billable vs Capacity",
-        "Billable vs Registered": "Billable vs Registered",
-        "Non-billable vs Schedule": "Non-billable vs Schedule",
-        "Non-billable vs Capacity": "Non-billable vs Capacity",
-        "Non-billable vs Registered": "Non-billable vs Registered"
+        "Billable Rate": "Billable hours compared to total capacity",
+        "Billable vs Registered": "Billable hours compared to hours registered",
+        "Billable vs Schedule": "Billable hours compared to work schedule",
+        "Registered vs Capacity": "Hours registered compared to total capacity",
+        "Registered vs Schedule": "Hours registered compared to work schedule",
+        "Billable & Non-billable vs Capacity": "Billable & Non-billable compared to total capacity",
+        "Billable & Non-billable vs Registered": "Billable & Non-billable compared to hours registered",
+        "Billable & Non-billable vs Schedule": "Billable & Non-billable compared to work schedule"
     }
     
     # Create filtered options in the correct order
     available_metrics = []
     ordered_metrics = [
-        "Registered vs Schedule",
-        "Registered vs Capacity", 
-        "Billable vs Schedule",
-        "Billable Rate",  # This is Billable vs Capacity
+        "Billable Rate",  # This is Billable vs Capacity (first group)
         "Billable vs Registered",
-        "Non-billable vs Schedule",
-        "Non-billable vs Capacity",
-        "Non-billable vs Registered"
+        "Billable vs Schedule",
+        "Registered vs Capacity",  # (second group)
+        "Registered vs Schedule",
+        "Billable & Non-billable vs Capacity",  # (third group - stacked charts)
+        "Billable & Non-billable vs Registered",
+        "Billable & Non-billable vs Schedule"
     ]
     
     # Add metrics in the specified order if they're available
     for metric in ordered_metrics:
-        if metric == "Registered vs Schedule" and "Hours/Period" in filtered_df.columns and "Hours/Registered" in filtered_df.columns:
-            available_metrics.append(metric)
-        elif metric == "Registered vs Capacity" and "Hours/Registered" in filtered_df.columns:
-            available_metrics.append(metric)
-        elif metric == "Billable vs Schedule" and "Hours/Period" in filtered_df.columns:
-            available_metrics.append(metric)
-        elif metric == "Billable Rate":  # Always available
+        if metric == "Billable Rate":  # Always available (Billable vs Capacity)
             available_metrics.append(metric)
         elif metric == "Billable vs Registered" and "Hours/Registered" in filtered_df.columns:
             available_metrics.append(metric)
-        elif metric == "Non-billable vs Schedule" and "Hours/Period" in filtered_df.columns and "Unpaid work" in filtered_df.columns:
+        elif metric == "Billable vs Schedule" and "Hours/Period" in filtered_df.columns:
             available_metrics.append(metric)
-        elif metric == "Non-billable vs Capacity" and "Unpaid work" in filtered_df.columns:
+        elif metric == "Registered vs Capacity" and "Hours/Registered" in filtered_df.columns:
             available_metrics.append(metric)
-        elif metric == "Non-billable vs Registered" and "Hours/Registered" in filtered_df.columns and "Unpaid work" in filtered_df.columns:
+        elif metric == "Registered vs Schedule" and "Hours/Period" in filtered_df.columns and "Hours/Registered" in filtered_df.columns:
+            available_metrics.append(metric)
+        elif metric == "Billable & Non-billable vs Capacity" and "Unpaid work" in filtered_df.columns:
+            available_metrics.append(metric)
+        elif metric == "Billable & Non-billable vs Registered" and "Hours/Registered" in filtered_df.columns and "Unpaid work" in filtered_df.columns:
+            available_metrics.append(metric)
+        elif metric == "Billable & Non-billable vs Schedule" and "Hours/Period" in filtered_df.columns and "Unpaid work" in filtered_df.columns:
             available_metrics.append(metric)
     
     # Only show dropdown if there are multiple metrics available
@@ -107,33 +122,81 @@ def render_comparison_chart(df, selected_person, target_value=80):
     else:
         selected_metric = "Billable Rate"
     
-    # Determine color based on metric type
-    if "Registered vs" in selected_metric:
-        bar_color = '#9d7dbc'  # Purple
-    elif "Billable vs" in selected_metric or selected_metric == "Billable Rate":
-        bar_color = '#2ca02c'  # Green
-    elif "Non-billable vs" in selected_metric:
-        bar_color = '#d62728'  # Red
+    # Check if this is a stacked chart
+    is_stacked = "Billable & Non-billable" in selected_metric
+    
+    if is_stacked:
+        # Create stacked bar chart
+        import plotly.graph_objects as go
+        
+        # Determine which baseline we're comparing to
+        if "vs Capacity" in selected_metric:
+            billable_col = "Billable % of Capacity"
+            nonbillable_col = "Non-billable % of Capacity"
+        elif "vs Registered" in selected_metric:
+            billable_col = "Billable % of Registered"
+            nonbillable_col = "Non-billable % of Registered"
+        else:  # vs Schedule
+            billable_col = "Billable % of Schedule"
+            nonbillable_col = "Non-billable % of Schedule"
+        
+        fig = go.Figure()
+        
+        # Add billable hours (green, bottom of stack)
+        fig.add_trace(go.Bar(
+            x=filtered_df["Period_display"],
+            y=filtered_df[billable_col],
+            name="Billable hours",
+            marker_color='#2ca02c',
+            text=[f"{val:.0f}%" for val in filtered_df[billable_col]],
+            textposition='inside',
+            textfont=dict(color='white', size=16, family='Arial, sans-serif')
+        ))
+        
+        # Add non-billable hours (red, top of stack)
+        fig.add_trace(go.Bar(
+            x=filtered_df["Period_display"],
+            y=filtered_df[nonbillable_col],
+            name="Non-billable hours",
+            marker_color='#d62728',
+            text=[f"{val:.0f}%" for val in filtered_df[nonbillable_col]],
+            textposition='inside',
+            textfont=dict(color='white', size=16, family='Arial, sans-serif')
+        ))
+        
+        fig.update_layout(
+            barmode='stack',
+            height=515,
+            showlegend=True,
+            legend=dict(font=dict(size=14))
+        )
+        
     else:
-        bar_color = '#4C78A8'  # Default blue
-    
-    # Create the bar chart with ordered periods and appropriate color
-    fig = px.bar(
-        filtered_df,
-        x="Period_display",
-        y=selected_metric,
-        labels={"Period_display": t("period"), selected_metric: f"{selected_metric} (%)"},
-        category_orders={"Period_display": filtered_df["Period_display"].tolist()},
-        color_discrete_sequence=[bar_color],
-        height=515
-    )
-    
-    # Add text labels inside the bars
-    fig.update_traces(
-        texttemplate='%{y:.0f}%', 
-        textposition='auto',
-        textfont=dict(color='white', size=16, family='Arial, sans-serif')
-    )
+        # Create regular single bar chart
+        # Determine color based on metric type
+        if "Registered vs" in selected_metric:
+            bar_color = '#9d7dbc'  # Purple
+        elif "Billable vs" in selected_metric or selected_metric == "Billable Rate":
+            bar_color = '#2ca02c'  # Green
+        else:
+            bar_color = '#4C78A8'  # Default blue
+        
+        fig = px.bar(
+            filtered_df,
+            x="Period_display",
+            y=selected_metric,
+            labels={"Period_display": t("period"), selected_metric: f"{selected_metric} (%)"},
+            category_orders={"Period_display": filtered_df["Period_display"].tolist()},
+            color_discrete_sequence=[bar_color],
+            height=515
+        )
+        
+        # Add text labels inside the bars
+        fig.update_traces(
+            texttemplate='%{y:.0f}%', 
+            textposition='auto',
+            textfont=dict(color='white', size=16, family='Arial, sans-serif')
+        )
 
     fig.update_layout(
     xaxis=dict(tickfont=dict(size=16)),

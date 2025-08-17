@@ -409,7 +409,7 @@ def display_monthly_breakdown(df, value_cols, translations_map, format_suffix,
             "Period_display",
             key=lambda x: pd.to_datetime(x, format="%b %Y")
         )
-    except:
+    except (ValueError, TypeError, pd.errors.ParserError):
         # Fallback to simple sorting if datetime conversion fails
         monthly_summary = monthly_summary.sort_values("Period_display")
     

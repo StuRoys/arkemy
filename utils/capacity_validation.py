@@ -98,7 +98,7 @@ def validate_capacity_config_schema(df: pd.DataFrame) -> Dict[str, Any]:
             # Try to parse as YAML first, then JSON
             try:
                 parsed_config = yaml.safe_load(config_content)
-            except:
+            except (yaml.YAMLError, ValueError):
                 parsed_config = json.loads(config_content)
             
             # Validate config structure
@@ -184,7 +184,7 @@ def _validate_schema(df: pd.DataFrame, schema: Dict[str, str], optional_columns:
                     for idx, value in df[column].items():
                         try:
                             pd.to_datetime(value)
-                        except:
+                        except (ValueError, TypeError):
                             problematic_rows.append((idx, value))
                     
                     if problematic_rows:
@@ -208,7 +208,7 @@ def _validate_schema(df: pd.DataFrame, schema: Dict[str, str], optional_columns:
                                 int(value)
                             else:
                                 float(value)
-                        except:
+                        except (ValueError, TypeError):
                             problematic_rows.append((idx, value))
                     
                     if problematic_rows:
@@ -382,7 +382,7 @@ def parse_capacity_config(config_content: str) -> Dict[str, Any]:
     try:
         # Try YAML first
         return yaml.safe_load(config_content)
-    except:
+    except (yaml.YAMLError, ValueError):
         try:
             # Fall back to JSON
             return json.loads(config_content)
