@@ -9,6 +9,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Test command**: `streamlit run main.py`
 - **Repository name**: `arkemy` (clean, professional)
 
+## 🚀 GIT WORKFLOW - PRODUCTION SAFETY
+**User is vibe coding, not a Git person - I handle ALL git operations**
+
+### Branch Strategy
+- **main** = Production branch (end users see this)
+- **develop** = Development branch (work happens here)
+- **ALWAYS work on develop branch unless explicitly merging to production**
+
+### Production Deployment Rules
+**ONLY push to main branch when user says EXACTLY:**
+- "Ship to production"
+- "Deploy to prod" 
+- "Push to main"
+- "Ready for users"
+
+**ALL other feedback stays on develop:**
+- "This works" ≠ production ready
+- "Looks good" = keep on develop
+- "Test this" = keep on develop
+- Any other positive feedback = keep on develop
+
+### My Git Responsibilities
+1. **Always check current branch** before any operations
+2. **Always work on develop branch** unless merging to main
+3. **Test locally first** before any main branch merge
+4. **Ask for confirmation** if production intent is unclear
+5. **Handle all git commands** - user never needs to know Git
+
+### Session Start Checklist
+- [ ] Check current branch: `git rev-parse --abbrev-ref HEAD`
+- [ ] Switch to develop if not already: `git checkout develop`
+- [ ] Proceed with development work
+
 ## Common Development Commands
 
 **Run the application:**
