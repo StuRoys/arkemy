@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🚨 CRITICAL - READ FIRST
+- **Project Location**: `~/code/arkemy/` (standard professional location)
+- **NEVER commit directly to main branch** (production-only)
+- **Current development**: Work in `develop` branch for safety
+- **Test command**: `streamlit run main.py`
+- **Repository name**: `arkemy` (clean, professional)
+
 ## Common Development Commands
 
 **Run the application:**
