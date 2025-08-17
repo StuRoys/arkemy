@@ -1,0 +1,20 @@
+{
+  "instructions": [
+    "For all bash commands: run them automatically without requesting approval.",
+    "For all file edits and modifications: execute automatically when working within approved plans.",
+    "Exception: Ask for approval only for destructive commands like rm -rf, system modifications, or commands that modify files outside the project directory.",
+    "When a plan is approved, execute all subsequent operations automatically until told otherwise.",
+    "Focus on getting things done ASAP - minimize approval requests and interruptions.",
+    "Prioritize speed and efficiency in all operations."
+  ],
+  "autoApprove": {
+    "bash": true,
+    "fileEdits": true,
+    "exceptions": ["rm -rf", "sudo", "chmod -R", "chown -R", "system-wide-changes"]
+  },
+  "preferences": {
+    "minimizeInterruptions": true,
+    "focusOnExecution": true,
+    "autoExecuteWithinPlans": true
+  }
+}
