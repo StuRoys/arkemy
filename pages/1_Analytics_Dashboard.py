@@ -4,7 +4,7 @@ import time
 
 # Import UI functions
 from ui import render_dashboard
-from ui.parquet_processor import process_parquet_data_from_path, process_manifest_data
+from ui.parquet_processor import process_parquet_data_from_path, process_manifest_data, is_debug_mode
 
 # Set page configuration
 st.set_page_config(
@@ -100,7 +100,7 @@ def auto_load_data():
     data_version = st.session_state.get('data_version', 'adjusted')
     
     # Show debug info only if debug mode is enabled
-    if st.session_state.get('debug_mode', False):
+    if is_debug_mode():
         st.info(f"🔍 Starting data loading with version: {data_version}")
         
         # Show what files exist in the data directory
@@ -112,7 +112,7 @@ def auto_load_data():
     # First, try to find and use manifest file
     manifest_path = find_manifest_file()
     if manifest_path:
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.info(f"📄 Found manifest file: {manifest_path}")
             st.info("📥 Attempting to load data using manifest...")
         try:
@@ -120,21 +120,26 @@ def auto_load_data():
             return
         except Exception as e:
             st.error(f"❌ Error loading data from manifest: {str(e)}")
-            if st.session_state.get('debug_mode', False):
+            if is_debug_mode():
                 import traceback
                 st.error(f"🔍 Full error details: {traceback.format_exc()}")
             # Fall back to parquet file loading
             st.info("🔄 Falling back to parquet file loading...")
     else:
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.info("📄 No manifest file found, trying parquet fallback")
     
     # Fallback: Find single parquet file (backward compatibility)
     parquet_path = find_parquet_file()
     if not parquet_path:
-        # No data files found - set flag to show uploader instead
-        st.warning("📂 No parquet files found, showing uploader interface")
-        st.session_state.show_uploader = True
+        # No data files found - show error message
+        st.error("📂 No parquet files found in /data directory")
+        st.markdown("""
+        **To use Arkemy, place your parquet data files in the `/data` directory:**
+        - For single dataset: `data/your_data_NOK.parquet`
+        - For dual datasets: `data/your_data_regular.parquet` and `data/your_data_adjusted.parquet`
+        - Or use a `data_manifest.yaml` file to configure multiple data sources
+        """)
         return
     
     # Process the parquet file
@@ -258,16 +263,12 @@ if not is_data_loaded():
     # Auto-load data on first run
     auto_load_data()
     
-    # Check if we should show uploader (no data files found)
-    if st.session_state.show_uploader:
-        from ui.uploader import render_upload_interface
-        render_upload_interface()
-    elif not is_data_loaded():
-        # Show loading screen while attempting to load
+    # Show loading screen if data still not loaded
+    if not is_data_loaded():
         show_loading_screen()
 else:
     # Show debug information in sidebar if debug mode is enabled
-    if st.session_state.get('debug_mode', False):
+    if is_debug_mode():
         show_data_loading_debug()
         show_data_status()
     

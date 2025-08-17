@@ -423,40 +423,24 @@ def handle_project_upload():
             st.session_state.project_data = autoloaded_data
             project_df = autoloaded_data
         else:
-            # Create file uploader for project data as fallback
-            project_file = st.file_uploader(
-                t('filter_upload_project_csv') if 'filter_upload_project_csv' in st.session_state.translations 
-                else "Upload your project CSV file here",
-                type=["csv"],
-                key="project_csv_uploader"
-            )
+            # No data found - show error message
+            st.error("📂 No project data found in /data directory")
+            st.markdown("""
+            **To view project reports, place a CSV file in the `/data` directory with one of these naming patterns:**
+            - `*project_report*.csv`
+            - `project*.csv`
+            - `prosjekt*.csv`
             
-            if project_file is None:
-                # Show only upload instruction
-                st.info("📂 No project data found in /data directory. " + 
-                       (t('filter_upload_instruction') if 'filter_upload_instruction' in st.session_state.translations 
-                        else "Please upload a CSV file with project data to view charts and tables."))
-                
-                # Display expected CSV structure
-                with st.expander(t('filter_expected_structure') if 'filter_expected_structure' in st.session_state.translations 
-                                else "Expected CSV structure"):
-                    st.markdown(t('filter_csv_structure') if 'filter_csv_structure' in st.session_state.translations else """
-                    Your CSV file should have the following columns:
-                    - Period
-                    - Project ID
-                    - Project Name
-                    - Period Hours
-                    - Planned Hours
-                    - Period Fees
-                    - Planned Income
-                    """)
-                return
-            else:
-                # Read the uploaded CSV file
-                project_df = pd.read_csv(project_file)
-                # Store in session state
-                st.session_state.project_data = project_df
-                st.rerun()
+            **Expected CSV structure:**
+            - Period
+            - Project ID
+            - Project Name
+            - Period Hours
+            - Planned Hours
+            - Period Fees
+            - Planned Income
+            """)
+            return
     else:
         # Use existing data from session state
         project_df = st.session_state.project_data

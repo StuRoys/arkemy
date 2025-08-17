@@ -14,6 +14,10 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional, Union
 import streamlit as st
 from pathlib import Path
+import logging
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 try:
     import yaml
@@ -313,7 +317,7 @@ def load_schema_from_yaml(yaml_file: str = "arkemy_schema_filtered.yaml") -> Opt
         return schema
         
     except Exception as e:
-        print(f"Warning: Could not load schema from {yaml_file}: {e}")
+        logger.warning(f"Could not load schema from {yaml_file}: {e}")
         return None
 
 

@@ -258,32 +258,29 @@ def handle_coworker_upload(filter_params=None, selected_person=None):
             st.session_state.coworker_data = autoloaded_data
             df = autoloaded_data
         else:
-            # File uploader as fallback
-            uploaded_file = st.file_uploader(t('upload_instruction'), type=["csv"], key="coworker_csv")
+            # No data found - show error message
+            st.error("📂 No coworker data found in /data directory")
+            st.markdown("""
+            **To view coworker reports, place a CSV file in the `/data` directory with one of these naming patterns:**
+            - `*coworker_report*.csv`
+            - `coworker*.csv`
+            - `person*.csv`
+            - `employee*.csv`
+            - `medarbeider*.csv`
+            - `people*.csv`
             
-            if uploaded_file is None:
-                # Show only upload instruction, no tabs
-                st.info("📂 No coworker data found in /data directory. Upload a CSV file to view coworker data.")
-                with st.expander("Expected CSV structure"):
-                    st.markdown("""
-                    Your CSV file should have the following columns:
-                    - Period (in datetime format)
-                    - Person
-                    - Hours/Period
-                    - Capacity/Period
-                    - Absence/Period
-                    - Hours/Registered
-                    - Project hours
-                    - Planned hours
-                    - Unpaid work
-                    """)
-                return filtered_period_info, selected_person
-            else:
-                # Read the uploaded CSV file
-                df = pd.read_csv(uploaded_file, usecols=lambda x: x != 'Unnamed: 0')
-                # Store in session state
-                st.session_state.coworker_data = df
-                st.rerun()
+            **Expected CSV structure:**
+            - Period (in datetime format)
+            - Person
+            - Hours/Period
+            - Capacity/Period
+            - Absence/Period
+            - Hours/Registered
+            - Project hours
+            - Planned hours
+            - Unpaid work
+            """)
+            return filtered_period_info, selected_person
     else:
         # Use existing data from session state
         df = st.session_state.coworker_data

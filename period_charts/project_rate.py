@@ -223,7 +223,7 @@ def render_all_projects_rate(df):
             "Period_display",
             key=lambda x: pd.to_datetime(x, format="%b %Y")
         )
-    except:
+    except (ValueError, TypeError, pd.errors.ParserError):
         # Fallback to simple sorting if datetime conversion fails
         agg_df = agg_df.sort_values("Period_display")
     
@@ -401,7 +401,7 @@ def render_all_projects_rate(df):
             "Period_display",
             key=lambda x: pd.to_datetime(x, format="%b %Y")
         )
-    except:
+    except (ValueError, TypeError, pd.errors.ParserError):
         # Fallback to simple sorting if datetime conversion fails
         monthly_df = monthly_df.sort_values("Period_display")
     

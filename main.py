@@ -26,8 +26,6 @@ if 'active_tab' not in st.session_state:
     st.session_state.active_tab = 0
 if 'data_loading_attempted' not in st.session_state:
     st.session_state.data_loading_attempted = False
-if 'show_uploader' not in st.session_state:
-    st.session_state.show_uploader = False
 
 # Initialize capacity-related session state variables
 if 'schedule_loaded' not in st.session_state:

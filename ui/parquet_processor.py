@@ -7,12 +7,25 @@ import re
 import yaml
 import glob
 import time
+import logging
 from utils.data_validation import (
     validate_csv_schema, transform_csv, display_validation_results,
     validate_planned_schema, transform_planned_csv, display_planned_validation_results
 )
 from utils.person_reference import enrich_person_data
 from utils.project_reference import enrich_project_data
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def is_debug_mode():
+    """Check if debug mode is enabled via environment variable or session state."""
+    # Check environment variable first (production override)
+    if os.getenv('ARKEMY_DEBUG', '').lower() in ('true', '1', 'yes'):
+        return True
+    # Fall back to session state for development
+    return st.session_state.get('debug_mode', False)
 from utils.planned_processors import calculate_planned_summary_metrics
 
 # Import capacity-related functions
@@ -102,7 +115,7 @@ def read_parquet_data_from_path(parquet_path, data_source, columns=None):
             return pd.DataFrame()
     except Exception as e:
         # Return empty DataFrame on error
-        print(f"Error reading Parquet data for {data_source}: {str(e)}")
+        logger.error(f"Error reading Parquet data for {data_source}: {str(e)}")
         return pd.DataFrame()
 
 @st.cache_data
@@ -121,7 +134,7 @@ def get_data_sources_from_path(parquet_path):
         df = pd.read_parquet(parquet_path, engine='pyarrow', columns=['data_source'])
         return df['data_source'].unique().tolist()
     except Exception as e:
-        print(f"Error getting data sources: {str(e)}")
+        logger.error(f"Error getting data sources: {str(e)}")
         return []
 
 # Apply caching to data transformation functions to improve performance
@@ -580,7 +593,7 @@ def substitute_version_in_path(file_path, version="adjusted"):
     result = file_path.replace('{version}', versioned_suffix)
     
     # Debug logging
-    if st.session_state.get('debug_mode', False):
+    if is_debug_mode():
         st.info(f"🐛 Debug - Version substitution: '{file_path}' → '{result}' (version: {version})")
     
     return result
@@ -597,7 +610,7 @@ def resolve_file_path(file_path, manifest_dir, allow_absolute=True):
     Returns:
         Resolved absolute file path (first match for glob patterns) or None if no matches
     """
-    if st.session_state.get('debug_mode', False):
+    if is_debug_mode():
         st.info(f"🐛 Debug - Resolving file path: '{file_path}' in dir '{manifest_dir}'")
     
     if os.path.isabs(file_path):
@@ -608,18 +621,18 @@ def resolve_file_path(file_path, manifest_dir, allow_absolute=True):
     else:
         resolved_path = os.path.join(manifest_dir, file_path)
     
-    if st.session_state.get('debug_mode', False):
+    if is_debug_mode():
         st.info(f"🐛 Debug - Resolved to: '{resolved_path}'")
     
     # Check if path contains glob patterns
     if '*' in resolved_path or '?' in resolved_path or '[' in resolved_path:
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.info(f"🐛 Debug - Using glob pattern matching...")
         
         # Use glob to find matching files
         matches = glob.glob(resolved_path)
         
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.info(f"🐛 Debug - Glob matches found: {len(matches)}")
             for i, match in enumerate(matches[:5]):  # Show first 5 matches
                 st.info(f"🐛 Debug - Match {i+1}: '{match}'")
@@ -629,16 +642,16 @@ def resolve_file_path(file_path, manifest_dir, allow_absolute=True):
         if matches:
             # Return first match, sorted for consistency
             result = sorted(matches)[0]
-            if st.session_state.get('debug_mode', False):
+            if is_debug_mode():
                 st.info(f"🐛 Debug - Selected first match: '{result}'")
             return result
         else:
-            if st.session_state.get('debug_mode', False):
+            if is_debug_mode():
                 st.warning(f"🐛 Debug - No files match glob pattern: '{resolved_path}'")
             return None
     else:
         # Regular file path
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             exists = os.path.exists(resolved_path)
             st.info(f"🐛 Debug - Regular file path, exists: {exists}")
         return resolved_path
@@ -657,24 +670,24 @@ def read_parquet_from_manifest(manifest_path, data_source, data_version, _file_m
     Returns:
         DataFrame containing the data or empty DataFrame if not found/error
     """
-    if st.session_state.get('debug_mode', False):
+    if is_debug_mode():
         st.info(f"🐛 Debug - Reading '{data_source}' from manifest: '{manifest_path}' (version: {data_version})")
     
     manifest = load_data_manifest(manifest_path, _file_mtime)
     if not manifest:
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.error(f"🐛 Debug - Cannot load manifest for data source '{data_source}'")
         return pd.DataFrame()
         
     data_sources = manifest.get('data_sources', {})
     if data_source not in data_sources:
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.warning(f"🐛 Debug - Data source '{data_source}' not found in manifest")
         return pd.DataFrame()
         
     source_config = data_sources[data_source]
     
-    if st.session_state.get('debug_mode', False):
+    if is_debug_mode():
         st.info(f"🐛 Debug - Source config for '{data_source}': {source_config}")
     
     # Check if source is required
@@ -685,7 +698,7 @@ def read_parquet_from_manifest(manifest_path, data_source, data_version, _file_m
     # Resolve file path with version substitution
     manifest_dir = os.path.dirname(os.path.abspath(manifest_path))
     
-    if st.session_state.get('debug_mode', False):
+    if is_debug_mode():
         st.info(f"🐛 Debug - Original file path: '{source_config['file_path']}'")
     
     # Substitute version in file path
@@ -697,12 +710,12 @@ def read_parquet_from_manifest(manifest_path, data_source, data_version, _file_m
         manifest.get('path_settings', {}).get('allow_absolute_paths', True)
     )
     
-    if st.session_state.get('debug_mode', False):
+    if is_debug_mode():
         st.info(f"🐛 Debug - Final resolved file path: '{file_path}'")
     
     # Check if file exists
     if not file_path or not os.path.exists(file_path):
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.warning(f"🐛 Debug - File does not exist: '{file_path}'")
         if source_config.get('required', False):
             st.error(f"Required data file not found: {file_path}")
@@ -712,7 +725,7 @@ def read_parquet_from_manifest(manifest_path, data_source, data_version, _file_m
         # Get columns to load
         columns = source_config.get('columns', None)
         
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.info(f"🐛 Debug - Loading columns: {columns if columns else 'ALL'}")
         
         # Show which exact file is being loaded (always show for troubleshooting)
@@ -724,7 +737,7 @@ def read_parquet_from_manifest(manifest_path, data_source, data_version, _file_m
         else:
             df = pd.read_parquet(file_path, engine='pyarrow', columns=columns)
         
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.info(f"🐛 Debug - Loaded file with {df.shape[0]} rows, {df.shape[1]} columns")
             st.info(f"🐛 Debug - Columns: {list(df.columns)}")
         
@@ -733,7 +746,7 @@ def read_parquet_from_manifest(manifest_path, data_source, data_version, _file_m
             # Multi-source file - filter by data source
             filtered_df = df[df['data_source'] == data_source]
             
-            if st.session_state.get('debug_mode', False):
+            if is_debug_mode():
                 st.info(f"🐛 Debug - Multi-source file: filtered to {filtered_df.shape[0]} rows for '{data_source}'")
             
             # Drop the data_source column as it's no longer needed
@@ -747,11 +760,11 @@ def read_parquet_from_manifest(manifest_path, data_source, data_version, _file_m
             # their designated data type (e.g., planned.parquet contains only planned data,
             # main.parquet contains only main data). The file path already determines the source.
             # See claude_docs/planned_data_loading_fix.md for details on why this matters.
-            if st.session_state.get('debug_mode', False):
+            if is_debug_mode():
                 st.info(f"🐛 Debug - Single-source file: returning data for '{data_source}' ({df.shape[0]} rows)")
             return df
     except Exception as e:
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.error(f"🐛 Debug - Error reading '{data_source}' from '{file_path}': {str(e)}")
         st.error(f"Error reading {data_source} data from {file_path}: {str(e)}")
         return pd.DataFrame()
@@ -823,7 +836,7 @@ def process_manifest_data(manifest_path):
     """
     try:
         # Show manifest processing status only in debug mode
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.info(f"🔧 Starting manifest processing: '{manifest_path}'")
         
         # Load and validate manifest
@@ -832,14 +845,14 @@ def process_manifest_data(manifest_path):
             st.error(f"❌ Failed to load manifest from: '{manifest_path}'")
             return
         
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.info("✅ Manifest loaded successfully")
             
         # Extract currency and client info from manifest
         currency = manifest.get('currency', 'nok')
         client_id = manifest.get('client_id')
         
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.info(f"🐛 Debug - Manifest currency: '{currency}', client_id: '{client_id}'")
         
         # Set currency in session state
@@ -863,12 +876,12 @@ def process_manifest_data(manifest_path):
         file_mtime = get_file_mtime(manifest_path)
         current_version = st.session_state.get('data_version', 'adjusted')
         
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.info(f"🐛 Debug - Checking data sources with file mtime: {file_mtime}")
         
         available_sources, detailed_status = get_manifest_data_sources(manifest_path, current_version, file_mtime)
         
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.info(f"🐛 Debug - Found {len(available_sources)} available sources: {available_sources}")
             st.info(f"🐛 Debug - Detailed status for {len(detailed_status)} configured sources")
         
@@ -883,7 +896,7 @@ def process_manifest_data(manifest_path):
         }
         
         # Show detailed status only in debug mode
-        if st.session_state.get('debug_mode', False):
+        if is_debug_mode():
             st.info("🔍 File Resolution Status:")
             for source_name, status in detailed_status.items():
                 icon = "✅" if status['exists'] else "❌"

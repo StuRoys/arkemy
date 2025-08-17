@@ -121,3 +121,28 @@ Built-in support for 50+ currencies with proper formatting, symbol positioning, 
 - Session state management ensures UI persistence across dataset switches
 - Sidebar provides clear indication of active dataset
 - Graceful handling of single vs multiple dataset scenarios
+
+## Production Deployment
+
+### Environment Configuration
+Set the following environment variable to disable debug mode in production:
+```bash
+export ARKEMY_DEBUG=false
+```
+
+### Data Volume Setup
+- **Data location**: Mount data files to `/data` directory in production
+- **File format**: Parquet files with currency code in filename (e.g., `data_NOK.parquet`)
+- **Dataset versioning**: Use `*_regular.parquet` and `*_adjusted.parquet` for dual dataset support
+- **Upload functionality**: Manual upload feature can be removed in production - app loads from `/data` automatically
+
+### Security Considerations
+- All unsafe HTML usage is for internal styling only (no user input)
+- Print statements replaced with proper logging
+- Debug mode controlled via environment variable
+- No hardcoded credentials or sensitive data exposure
+
+### Performance
+- Application uses Streamlit caching for data operations
+- Memory management with garbage collection for large datasets
+- Automatic Parquet file detection and loading
