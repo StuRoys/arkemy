@@ -408,9 +408,8 @@ def render_sidebar_filters(df, planned_df=None):
     if st.session_state.get('authenticated', False):
         st.sidebar.markdown(f"Logged in as: {getattr(st.session_state.user, 'email', 'User')}")
         
-        if st.sidebar.button("🚪 Logout"):
+        if st.sidebar.button("🚪 Logout", key="logout_sidebar_button"):
             # Import here to avoid circular imports
-            import os
             from supabase import create_client
             
             # Get Supabase client
@@ -421,12 +420,18 @@ def render_sidebar_filters(df, planned_df=None):
                 supabase = create_client(url, key)
                 try:
                     supabase.auth.sign_out()
-                except:
-                    pass  # Ignore errors on logout
+                except Exception as e:
+                    print(f"🔍 TERMINAL: Logout error: {e}")
             
             # Clear session state
             st.session_state.authenticated = False
             st.session_state.user = None
+            
+            # Clear other session state that might interfere
+            for key in list(st.session_state.keys()):
+                if key not in ['authenticated', 'user']:
+                    del st.session_state[key]
+            
             st.rerun()
         
     return filtered_df, filtered_planned_df, filter_settings

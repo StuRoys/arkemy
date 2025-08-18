@@ -32,6 +32,13 @@ def get_supabase_client():
     
     return create_client(url, key)
 
+def validate_email_domain(email):
+    """Validate email domain against allowed domain"""
+    allowed_domain = os.getenv('ALLOWED_EMAIL_DOMAIN')
+    if allowed_domain and not email.endswith(f"@{allowed_domain}"):
+        return False, "Please use your company email address"
+    return True, ""
+
 @st.dialog("Create Account")
 def signup_modal():
     """Modal dialog for account creation"""
@@ -88,6 +95,12 @@ def signup_modal():
     
     # Handle signup logic
     if signup_clicked and signup_email and signup_password:
+        # Validate email domain first
+        domain_valid, domain_error = validate_email_domain(signup_email)
+        if not domain_valid:
+            st.error(domain_error)
+            return
+        
         try:
             with st.spinner("Creating account..."):
                 response = supabase.auth.sign_up({
@@ -96,7 +109,7 @@ def signup_modal():
                 })
                 
                 if response.user:
-                    st.success("Account created! Please check your email to confirm your account, then login.")
+                    st.success("A verification link has been sent to your email")
                     st.rerun()
                 else:
                     st.error("Account creation failed.")
@@ -324,6 +337,12 @@ def show_login_page():
         
         # Handle login (outside the form)
         if login_clicked and email and password:
+            # Validate email domain first
+            domain_valid, domain_error = validate_email_domain(email)
+            if not domain_valid:
+                st.error(domain_error)
+                return
+            
             try:
                 with st.spinner("Signing in..."):
                     response = supabase.auth.sign_in_with_password({
