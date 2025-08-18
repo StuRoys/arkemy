@@ -1,13 +1,13 @@
-# main.py - Application Entry Point and Orchestration
+# main.py - Application Entry Point with Authentication
 import streamlit as st
 import os
 from dotenv import load_dotenv
-from supabase import create_client, Client
+import streamlit_authenticator as stauth
 
 # Load environment variables
 load_dotenv()
 
-# Set global app configuration
+# Set page configuration
 st.set_page_config(
     page_title="Arkemy: Turn Your Project Data Into Gold 🥇",
     page_icon="📊",
@@ -15,7 +15,66 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize global session state variables
+# ==========================================
+# AUTHENTICATION SETUP - RUNS FIRST
+# ==========================================
+
+# Authentication configuration
+config = {
+    'credentials': {
+        'usernames': {
+            'admin': {
+                'name': 'Administrator',
+                'password': 'password123'
+            }
+        }
+    },
+    'cookie': {
+        'name': 'arkemy_auth',
+        'key': 'arkemy_signature_key_2025', 
+        'expiry_days': 30
+    }
+}
+
+# Initialize authenticator
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    config['cookie']['name'], 
+    config['cookie']['key'],
+    config['cookie']['expiry_days'],
+    auto_hash=True
+)
+
+# Render login widget
+authenticator.login(location='main')
+
+# Get authentication status
+name = st.session_state.get('name')
+authentication_status = st.session_state.get('authentication_status') 
+username = st.session_state.get('username')
+
+# ==========================================
+# AUTHENTICATION CHECK - STOP HERE IF NOT AUTHENTICATED
+# ==========================================
+
+# Check authentication status and handle accordingly
+if authentication_status != True:
+    # User is NOT authenticated - show only login screen
+    if authentication_status == False:
+        st.error('Username/password is incorrect')
+    elif authentication_status == None:
+        st.warning('Please enter your username and password')
+    
+    # STOP EXECUTION - nothing else should run
+    st.stop()
+
+# ==========================================
+# AUTHENTICATED USER SECTION - ONLY RUNS IF LOGGED IN
+# ==========================================
+
+# User is authenticated - now set up the full application
+
+# Initialize global session state variables (only for authenticated users)
 if 'csv_loaded' not in st.session_state:
     st.session_state.csv_loaded = False
 if 'transformed_df' not in st.session_state:
@@ -49,75 +108,22 @@ if 'capacity_summary_loaded' not in st.session_state:
 if 'capacity_summary_df' not in st.session_state:
     st.session_state.capacity_summary_df = None
 
-# Initialize authentication session state
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-if 'user' not in st.session_state:
-    st.session_state.user = None
+# Set up app pages - ONLY for authenticated users
+pages = [
+    st.Page("app_pages/1_Analytics_Dashboard.py", title="Analytics Dashboard", icon="📊"),
+    st.Page("app_pages/2_Coworker_Report.py", title="Coworker Report", icon="👥"),
+    st.Page("app_pages/3_Project_Report.py", title="Project Report", icon="📁"),
+    st.Page("app_pages/4_Hrs_SQM_Phase.py", title="Hours / m2 (beta)", icon="🏗️")
+]
 
-# Initialize Supabase client
-@st.cache_resource
-def get_supabase_client():
-    """Initialize and cache Supabase client"""
-    url = os.getenv('SUPABASE_URL')
-    key = os.getenv('SUPABASE_KEY')
-    
-    if not url or not key or url == 'your_supabase_project_url_here':
-        return None
-    
-    return create_client(url, key)
-
-
-def check_authentication():
-    """Check authentication status and set session state - no stopping here"""
-    # Development bypass
-    if os.getenv('ENVIRONMENT') == 'development':
-        st.session_state.authenticated = True
-        st.session_state.user = {'email': 'dev@localhost', 'role': 'developer'}
-        return
-    
-    # Check if we already have authentication in session state
-    if st.session_state.authenticated:
-        return
-    
-    # Check if user has valid Supabase session
-    supabase = get_supabase_client()
-    if supabase:
-        try:
-            session = supabase.auth.get_session()
-            if session and session.user:
-                # Valid session found, restore authentication state
-                st.session_state.authenticated = True
-                st.session_state.user = session.user
-                return
-        except Exception as e:
-            # Session check failed, user will need to login
-            pass
-    
-    # No valid session found, user needs to authenticate
-
-# Check authentication status
-check_authentication()
-
-# Dynamic page navigation based on authentication status
-if st.session_state.authenticated:
-    # Authenticated users see all app pages
-    pages = [
-        st.Page("pages/1_Analytics_Dashboard.py", title="Analytics Dashboard", icon="📊"),
-        st.Page("pages/2_Coworker_Report.py", title="Coworker Report", icon="👥"),
-        st.Page("pages/3_Project_Report.py", title="Project Report", icon="📁"),
-        st.Page("pages/4_Hrs_SQM_Phase.py", title="Hours / m2 (beta)", icon="🏗️")
-    ]
-    
-    print("🔍 TERMINAL: Setting up authenticated navigation")
-else:
-    # Non-authenticated users only see login page
-    pages = [
-        st.Page("pages/login.py", title="Login", icon="🔐")
-    ]
-    
-    print("🔍 TERMINAL: Setting up login-only navigation")
-
-# Set up navigation with dynamic pages
+# Set up navigation - this creates the sidebar automatically
 pg = st.navigation(pages)
+
+# Add logout to sidebar AFTER navigation is set up
+with st.sidebar:
+    st.markdown("---")
+    st.markdown(f"**Logged in as:** {name}")
+    authenticator.logout('Logout', 'sidebar', key='logout_main')
+
+# Run the authenticated application
 pg.run()

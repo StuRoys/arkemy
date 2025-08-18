@@ -403,35 +403,5 @@ def render_sidebar_filters(df, planned_df=None):
         st.session_state.data_loading_attempted = False
         st.rerun()
     
-    
-    # Add welcome and logout to very bottom of sidebar for authenticated users
-    if st.session_state.get('authenticated', False):
-        st.sidebar.markdown(f"Logged in as: {getattr(st.session_state.user, 'email', 'User')}")
-        
-        if st.sidebar.button("🚪 Logout", key="logout_sidebar_button"):
-            # Import here to avoid circular imports
-            from supabase import create_client
-            
-            # Get Supabase client
-            url = os.getenv('SUPABASE_URL')
-            key = os.getenv('SUPABASE_KEY')
-            
-            if url and key and url != 'your_supabase_project_url_here':
-                supabase = create_client(url, key)
-                try:
-                    supabase.auth.sign_out()
-                except Exception as e:
-                    print(f"🔍 TERMINAL: Logout error: {e}")
-            
-            # Clear session state
-            st.session_state.authenticated = False
-            st.session_state.user = None
-            
-            # Clear other session state that might interfere
-            for key in list(st.session_state.keys()):
-                if key not in ['authenticated', 'user']:
-                    del st.session_state[key]
-            
-            st.rerun()
         
     return filtered_df, filtered_planned_df, filter_settings

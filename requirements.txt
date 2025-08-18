@@ -4,6 +4,6 @@ numpy>=1.24.0
 plotly>=5.13.0
 pyarrow>=12.0.0
 pyyaml>=6.0
-supabase>=2.0.0
 python-dotenv>=1.0.0
 streamlit-extras>=0.3.0
+streamlit-authenticator>=0.4.2
