@@ -349,7 +349,7 @@ def render_sidebar_filters(df, planned_df=None):
     display_filter_badges(filter_settings, location="sidebar")
     
     # Dataset version selector
-    st.sidebar.markdown("---")  # Add a separator
+    st.sidebar.markdown("---")
     
     # Detect available datasets
     dataset_info = detect_available_datasets()
@@ -381,7 +381,6 @@ def render_sidebar_filters(df, planned_df=None):
             else:
                 st.sidebar.info("💰 Using Regular Values (only dataset available)")
         elif len(dataset_info['available_versions']) == 0:
-            st.sidebar.warning("⚠️ No datasets found")
             selected_version = "adjusted"  # Fallback
     
     # Trigger reload if version changed
@@ -405,17 +404,29 @@ def render_sidebar_filters(df, planned_df=None):
         st.rerun()
     
     
-    # Debug toggle at the bottom of sidebar
-    st.sidebar.markdown("---")  # Add separator
-    
-    # Initialize debug mode if not set
-    if 'debug_mode' not in st.session_state:
-        st.session_state.debug_mode = False
-    
-    # Debug toggle button
-    debug_label = "🐛 Debug: ON" if st.session_state.debug_mode else "🐛 Debug: OFF"
-    if st.sidebar.button(debug_label, help="Toggle debug information display"):
-        st.session_state.debug_mode = not st.session_state.debug_mode
-        st.rerun()
+    # Add welcome and logout to very bottom of sidebar for authenticated users
+    if st.session_state.get('authenticated', False):
+        st.sidebar.markdown(f"Logged in as: {getattr(st.session_state.user, 'email', 'User')}")
+        
+        if st.sidebar.button("🚪 Logout"):
+            # Import here to avoid circular imports
+            import os
+            from supabase import create_client
+            
+            # Get Supabase client
+            url = os.getenv('SUPABASE_URL')
+            key = os.getenv('SUPABASE_KEY')
+            
+            if url and key and url != 'your_supabase_project_url_here':
+                supabase = create_client(url, key)
+                try:
+                    supabase.auth.sign_out()
+                except:
+                    pass  # Ignore errors on logout
+            
+            # Clear session state
+            st.session_state.authenticated = False
+            st.session_state.user = None
+            st.rerun()
         
     return filtered_df, filtered_planned_df, filter_settings

@@ -1,5 +1,11 @@
 # main.py - Application Entry Point and Orchestration
 import streamlit as st
+import os
+from dotenv import load_dotenv
+from supabase import create_client, Client
+
+# Load environment variables
+load_dotenv()
 
 # Set global app configuration
 st.set_page_config(
@@ -43,16 +49,75 @@ if 'capacity_summary_loaded' not in st.session_state:
 if 'capacity_summary_df' not in st.session_state:
     st.session_state.capacity_summary_df = None
 
-# Define pages explicitly for navigation
-pages = [
-    st.Page("pages/1_Analytics_Dashboard.py", title="Analytics Dashboard", icon="📊"),
-    st.Page("pages/2_Coworker_Report.py", title="Coworker Report", icon="👥"),
-    st.Page("pages/3_Project_Report.py", title="Project Report", icon="📁"),
-    st.Page("pages/4_Hrs_SQM_Phase.py", title="Hrs SQM Phase", icon="🏗️"),
-    st.Page("pages/5_Admin.py", title="Admin", icon="⚙️")
-]
+# Initialize authentication session state
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+if 'user' not in st.session_state:
+    st.session_state.user = None
 
-# Set up navigation (Analytics Dashboard will be default since it's first)
-print("🔍 TERMINAL: Setting up navigation with Analytics Dashboard as default")
+# Initialize Supabase client
+@st.cache_resource
+def get_supabase_client():
+    """Initialize and cache Supabase client"""
+    url = os.getenv('SUPABASE_URL')
+    key = os.getenv('SUPABASE_KEY')
+    
+    if not url or not key or url == 'your_supabase_project_url_here':
+        return None
+    
+    return create_client(url, key)
+
+
+def check_authentication():
+    """Check authentication status and set session state - no stopping here"""
+    # Development bypass
+    if os.getenv('ENVIRONMENT') == 'development':
+        st.session_state.authenticated = True
+        st.session_state.user = {'email': 'dev@localhost', 'role': 'developer'}
+        return
+    
+    # Check if we already have authentication in session state
+    if st.session_state.authenticated:
+        return
+    
+    # Check if user has valid Supabase session
+    supabase = get_supabase_client()
+    if supabase:
+        try:
+            session = supabase.auth.get_session()
+            if session and session.user:
+                # Valid session found, restore authentication state
+                st.session_state.authenticated = True
+                st.session_state.user = session.user
+                return
+        except Exception as e:
+            # Session check failed, user will need to login
+            pass
+    
+    # No valid session found, user needs to authenticate
+
+# Check authentication status
+check_authentication()
+
+# Dynamic page navigation based on authentication status
+if st.session_state.authenticated:
+    # Authenticated users see all app pages
+    pages = [
+        st.Page("pages/1_Analytics_Dashboard.py", title="Analytics Dashboard", icon="📊"),
+        st.Page("pages/2_Coworker_Report.py", title="Coworker Report", icon="👥"),
+        st.Page("pages/3_Project_Report.py", title="Project Report", icon="📁"),
+        st.Page("pages/4_Hrs_SQM_Phase.py", title="Hours / m2 (beta)", icon="🏗️")
+    ]
+    
+    print("🔍 TERMINAL: Setting up authenticated navigation")
+else:
+    # Non-authenticated users only see login page
+    pages = [
+        st.Page("pages/login.py", title="Login", icon="🔐")
+    ]
+    
+    print("🔍 TERMINAL: Setting up login-only navigation")
+
+# Set up navigation with dynamic pages
 pg = st.navigation(pages)
 pg.run()
