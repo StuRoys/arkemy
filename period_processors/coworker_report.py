@@ -9,9 +9,21 @@ from period_charts.coworker_hours_flow import render_hours_flow_chart
 from period_charts.coworker_utils import render_details_section, render_data_section
 from period_translations.translations import t
 
+def get_data_directory():
+    """Get the appropriate data directory - Railway volume or local"""
+    # Check for Railway volume first
+    if os.path.exists("/data"):
+        return "/data"
+    # Check for local temp directory
+    elif os.path.exists(os.path.expanduser("~/temp_data")):
+        return os.path.expanduser("~/temp_data")
+    # Fallback to local data directory
+    else:
+        return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+
 def try_autoload_coworker_data():
-    """Try to autoload coworker data from /data directory."""
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+    """Try to autoload coworker data from data directory."""
+    data_dir = get_data_directory()
     
     # Look for CSV files that might contain coworker data
     # Common patterns: coworker*.csv, person*.csv, employee*.csv, medarbeider*.csv (Norwegian)

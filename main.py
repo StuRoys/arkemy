@@ -43,22 +43,16 @@ if 'capacity_summary_loaded' not in st.session_state:
 if 'capacity_summary_df' not in st.session_state:
     st.session_state.capacity_summary_df = None
 
-# Hide main page from sidebar navigation (replicates your manual DOM edit)
-st.markdown("""
-<style>
-    /* Target first navigation item (main is typically first) */
-    section[data-testid="stSidebar"] ul li:first-child span {
-        font-size: 0 !important;
-        visibility: hidden !important;
-    }
-    
-    /* Also target by partial class match since emotion classes can change */
-    section[data-testid="stSidebar"] span[class*="st-emotion-cache-a8ha1g"] {
-        font-size: 0 !important;
-        visibility: hidden !important;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Define pages explicitly for navigation
+pages = [
+    st.Page("pages/1_Analytics_Dashboard.py", title="Analytics Dashboard", icon="📊"),
+    st.Page("pages/2_Coworker_Report.py", title="Coworker Report", icon="👥"),
+    st.Page("pages/3_Project_Report.py", title="Project Report", icon="📁"),
+    st.Page("pages/4_Hrs_SQM_Phase.py", title="Hrs SQM Phase", icon="🏗️"),
+    st.Page("pages/5_Admin.py", title="Admin", icon="⚙️")
+]
 
-# Auto-redirect to Analytics Dashboard (default landing page)
-st.switch_page("pages/1_Analytics_Dashboard.py")
+# Set up navigation (Analytics Dashboard will be default since it's first)
+print("🔍 TERMINAL: Setting up navigation with Analytics Dashboard as default")
+pg = st.navigation(pages)
+pg.run()

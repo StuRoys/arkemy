@@ -229,52 +229,40 @@ def process_parquet_data_from_path(parquet_path):
         # Extract client ID from filename
         client_id = extract_client_from_filename(parquet_path)
         
-        # Load capacity configuration from YAML if client detected
-        capacity_config = None
-        if client_id:
-            try:
-                capacity_config = load_client_absence_config(client_id)
-                st.session_state.capacity_config = capacity_config
-                st.success(f"Loaded capacity configuration for client: {client_id}")
-                
-                # Show config summary
-                with st.expander("Capacity Configuration Details"):
-                    st.json(capacity_config)
-            except Exception as e:
-                st.warning(f"Could not load capacity config for {client_id}: {str(e)}")
+        # Skip capacity config loading for simple parquet loading
+        print("🔍 TERMINAL: Skipping capacity config loading for simplified loading")
         
-        # Get available data sources (this is cached)
-        data_sources = get_data_sources_from_path(parquet_path)
-        
-        if not data_sources:
-            st.error("The Parquet file does not contain a 'data_source' column. Please use a Parquet file created with the conversion tool.")
-            return
+        # Skip data_source column requirement for simple loading
+        print("🔍 TERMINAL: Loading parquet file without data_source column requirement")
         
         # Store debug information in session state  
         st.session_state.data_loading_method = "single_file"
         st.session_state.manifest_debug_info = {
             'parquet_path': parquet_path,
-            'data_sources': data_sources,
+            'data_sources': ['main'],  # Simple loading assumes main data source
             'currency': currency,
             'client_id': client_id
         }
         
-        # Display basic information about the data sources
-        st.success(f"Successfully detected data sources in Parquet file.")
-        st.info(f"📄 Using single-file loading (legacy mode)")
-        st.info(f"Data sources found: {', '.join(data_sources)}")
+        # Load parquet file directly without data_source filtering
+        print("🔍 TERMINAL: Loading parquet file directly")
         
-        # Load main data first (this is cached)
-        main_data = read_parquet_data_from_path(parquet_path, 'main')
+        try:
+            main_data = pd.read_parquet(parquet_path, engine='pyarrow')
+            print(f"🔍 TERMINAL: Loaded {main_data.shape[0]} rows, {main_data.shape[1]} columns")
+        except Exception as e:
+            st.error(f"❌ Error loading parquet file: {str(e)}")
+            return
         
         # Process main data
         if main_data.empty:
             st.error("No main project data found in the Parquet file.")
             return
         
-        # Validate main data schema
+        # Validate main data schema (silent for clean UI)
         validation_results = validate_csv_schema(main_data)
-        display_validation_results(validation_results)
+        print(f"🔍 TERMINAL: Schema validation - Valid: {validation_results['is_valid']}")
+        # display_validation_results(validation_results)  # Commented out for clean UI
         
         # If the data is valid, proceed with transformation and store in session state
         if validation_results["is_valid"]:
@@ -286,112 +274,12 @@ def process_parquet_data_from_path(parquet_path):
             del main_data
             gc.collect()
             
-            # Process planned data if available
-            if 'planned' in data_sources:
-                # Load planned data (this is cached)
-                planned_data = read_parquet_data_from_path(parquet_path, 'planned')
-                
-                if planned_data is not None and not planned_data.empty:
-                    planned_validation_results = validate_planned_schema(planned_data)
-                    st.subheader("Planned Hours Validation")
-                    display_planned_validation_results(planned_validation_results)
-                    
-                    if planned_validation_results["is_valid"]:
-                        transformed_planned_df = cached_transform_planned_csv(planned_data)
-                        st.session_state.transformed_planned_df = transformed_planned_df
-                        st.session_state.planned_csv_loaded = True
-                        st.success(f"Loaded planned hours data with {planned_data.shape[0]} rows.")
-                        
-                        # Calculate and display summary metrics for planned hours
-                        planned_metrics = calculate_planned_summary_metrics(transformed_planned_df)
-                        st.info(
-                            f"Total planned hours: {int(planned_metrics['total_planned_hours']):,}\n"
-                            f"Projects: {planned_metrics['unique_projects']}\n"
-                            f"People: {planned_metrics['unique_people']}"
-                        )
-                        
-                        # Store max planned date in session state for date filter extension
-                        if 'Date' in transformed_planned_df.columns and not transformed_planned_df.empty:
-                            st.session_state.planned_max_date = transformed_planned_df['Date'].max().date()
-                            st.info(f"Planned hours extend to: {st.session_state.planned_max_date}")
-                
-                # Clean up memory
-                del planned_data
-                gc.collect()
-            
-            # Process capacity data sources
-            process_capacity_data_sources(parquet_path, data_sources, capacity_config)
-            
-            # Process person reference data if available
-            if 'person_reference' in data_sources:
-                # Load person reference data (this is cached)
-                person_ref_data = read_parquet_data_from_path(parquet_path, 'person_reference')
-                
-                if person_ref_data is not None and not person_ref_data.empty:
-                    # Validate basic structure (must have Person and Person type columns)
-                    if "person_name" not in person_ref_data.columns or "person_type" not in person_ref_data.columns:
-                        st.error("Person reference data must contain 'Person' and 'Person type' columns")
-                    else:
-                        # Make sure Person type values are standardized (convert to lowercase)
-                        person_ref_data['Person type'] = person_ref_data['Person type'].str.lower()
-                        
-                        # Store in session state
-                        st.session_state.person_reference_df = person_ref_data
-                        st.success(f"Loaded person reference data with {person_ref_data.shape[0]} entries.")
-                        
-                        # Immediately apply to the main dataframe if it exists
-                        if 'transformed_df' in st.session_state and st.session_state.transformed_df is not None:
-                            st.session_state.transformed_df = cached_enrich_person_data(
-                                st.session_state.transformed_df, 
-                                person_ref_data
-                            )
-                
-                # Clean up memory
-                del person_ref_data
-                gc.collect()
-            
-            # Process project reference data if available
-            if 'project_reference' in data_sources:
-                # Load project reference data (this is cached)
-                project_ref_data = read_parquet_data_from_path(parquet_path, 'project_reference')
-                
-                if project_ref_data is not None and not project_ref_data.empty:
-                    # Validate basic structure (must have Project number column)
-                    if "project_number" not in project_ref_data.columns:
-                        st.error("Project reference data must contain 'Project number' column")
-                    else:
-                        st.session_state.project_reference_df = project_ref_data
-                        st.success(f"Loaded project reference data with {project_ref_data.shape[0]} entries.")
-                        
-                        # Immediately apply to the main dataframe if it exists
-                        if 'transformed_df' in st.session_state and st.session_state.transformed_df is not None:
-                            st.session_state.transformed_df = cached_enrich_project_data(
-                                st.session_state.transformed_df, 
-                                project_ref_data
-                            )
-                            st.success("Applied project reference data to main dataset.")
-                        
-                        # Show sample of the data and metadata columns
-                        with st.expander("Project Reference Data"):
-                            st.write(project_ref_data.head())
-                            metadata_columns = [col for col in project_ref_data.columns if col != 'Project number']
-                            if metadata_columns:
-                                st.info(f"Metadata columns: {', '.join(metadata_columns)}")
-                            else:
-                                st.warning("No metadata columns found besides 'Project number'")
-                
-                # Clean up memory
-                del project_ref_data
-                gc.collect()
-            
-            # Final cleanup
-            gc.collect()
-            
-            # Reset loading flag so dashboard can render
-            st.session_state.data_loading_attempted = False
-            
-            # Force page refresh to show dashboard
-            st.rerun()
+            # End processing here for simplified loading - skip all optional data
+            print(f"🔍 TERMINAL: Main data loaded successfully!")
+            print(f"🔍 TERMINAL: Loaded {transformed_df.shape[0]} rows, {transformed_df.shape[1]} columns into session state")
+            print(f"🔍 TERMINAL: Session state - csv_loaded: {st.session_state.csv_loaded}")
+            print(f"🔍 TERMINAL: Currency: {st.session_state.currency}")
+            return
             
     except Exception as e:
         st.error(f"Error processing the Parquet file: {str(e)}")
@@ -598,62 +486,73 @@ def substitute_version_in_path(file_path, version="adjusted"):
     
     return result
 
-def resolve_file_path(file_path, manifest_dir, allow_absolute=True):
+def resolve_file_path(file_path, manifest_dir, allow_absolute=True, fallback_path=None):
     """
-    Resolve file path relative to manifest directory, with glob pattern support.
+    Resolve file path relative to manifest directory, with glob pattern support and fallback.
     
     Args:
         file_path: File path from manifest (can include glob patterns like *.parquet)
         manifest_dir: Directory containing the manifest file
         allow_absolute: Whether to allow absolute paths
+        fallback_path: Optional fallback path to try if primary path has no matches
         
     Returns:
         Resolved absolute file path (first match for glob patterns) or None if no matches
     """
-    if is_debug_mode():
-        st.info(f"🐛 Debug - Resolving file path: '{file_path}' in dir '{manifest_dir}'")
+    # Force debug output for troubleshooting
+    st.info(f"🐛 DEBUG: Resolving file path: '{file_path}' in dir '{manifest_dir}'")
+    if fallback_path:
+        st.info(f"🐛 DEBUG: Fallback path available: '{fallback_path}'")
     
-    if os.path.isabs(file_path):
+    # Expand ~ first, before any other processing
+    expanded_path = os.path.expanduser(file_path)
+    
+    if os.path.isabs(expanded_path):
         if allow_absolute:
-            resolved_path = file_path
+            resolved_path = expanded_path
         else:
             raise ValueError(f"Absolute paths not allowed: {file_path}")
     else:
-        resolved_path = os.path.join(manifest_dir, file_path)
-    
-    if is_debug_mode():
-        st.info(f"🐛 Debug - Resolved to: '{resolved_path}'")
+        resolved_path = os.path.join(manifest_dir, expanded_path)
+    st.info(f"🐛 DEBUG: Resolved to: '{resolved_path}'")
     
     # Check if path contains glob patterns
     if '*' in resolved_path or '?' in resolved_path or '[' in resolved_path:
-        if is_debug_mode():
-            st.info(f"🐛 Debug - Using glob pattern matching...")
+        st.info(f"🐛 DEBUG: Using glob pattern matching on: '{resolved_path}'")
         
         # Use glob to find matching files
         matches = glob.glob(resolved_path)
         
-        if is_debug_mode():
-            st.info(f"🐛 Debug - Glob matches found: {len(matches)}")
-            for i, match in enumerate(matches[:5]):  # Show first 5 matches
-                st.info(f"🐛 Debug - Match {i+1}: '{match}'")
-            if len(matches) > 5:
-                st.info(f"🐛 Debug - ... and {len(matches) - 5} more matches")
+        st.info(f"🐛 DEBUG: Glob matches found: {len(matches)}")
+        for i, match in enumerate(matches[:5]):  # Show first 5 matches
+            st.info(f"🐛 DEBUG: Match {i+1}: '{match}'")
+        if len(matches) > 5:
+            st.info(f"🐛 DEBUG: ... and {len(matches) - 5} more matches")
         
         if matches:
             # Return first match, sorted for consistency
             result = sorted(matches)[0]
-            if is_debug_mode():
-                st.info(f"🐛 Debug - Selected first match: '{result}'")
+            st.info(f"🐛 DEBUG: Selected first match: '{result}'")
             return result
         else:
-            if is_debug_mode():
-                st.warning(f"🐛 Debug - No files match glob pattern: '{resolved_path}'")
+            st.warning(f"🐛 DEBUG: No files match glob pattern: '{resolved_path}'")
+            # Try fallback path if provided
+            if fallback_path:
+                st.info(f"🐛 DEBUG: Trying fallback path: '{fallback_path}'")
+                return resolve_file_path(fallback_path, manifest_dir, allow_absolute, fallback_path=None)
             return None
     else:
         # Regular file path
+        exists = os.path.exists(resolved_path)
         if is_debug_mode():
-            exists = os.path.exists(resolved_path)
             st.info(f"🐛 Debug - Regular file path, exists: {exists}")
+        
+        # If primary path doesn't exist, try fallback
+        if not exists and fallback_path:
+            if is_debug_mode():
+                st.info(f"🐛 Debug - Primary path doesn't exist, trying fallback: '{fallback_path}'")
+            return resolve_file_path(fallback_path, manifest_dir, allow_absolute, fallback_path=None)
+        
         return resolved_path
 
 @st.cache_data
@@ -704,10 +603,15 @@ def read_parquet_from_manifest(manifest_path, data_source, data_version, _file_m
     # Substitute version in file path
     versioned_file_path = substitute_version_in_path(source_config['file_path'], data_version)
     
+    fallback_path = source_config.get('fallback_path')
+    if fallback_path:
+        fallback_path = substitute_version_in_path(fallback_path, data_version)
+    
     file_path = resolve_file_path(
         versioned_file_path, 
         manifest_dir,
-        manifest.get('path_settings', {}).get('allow_absolute_paths', True)
+        manifest.get('path_settings', {}).get('allow_absolute_paths', True),
+        fallback_path
     )
     
     if is_debug_mode():
@@ -804,10 +708,15 @@ def get_manifest_data_sources(manifest_path, data_version, _file_mtime=None):
         }
         
         try:
+            fallback_path = source_config.get('fallback_path')
+            if fallback_path:
+                fallback_path = substitute_version_in_path(fallback_path, data_version)
+            
             resolved_path = resolve_file_path(
                 versioned_file_path, 
                 manifest_dir,
-                manifest.get('path_settings', {}).get('allow_absolute_paths', True)
+                manifest.get('path_settings', {}).get('allow_absolute_paths', True),
+                fallback_path
             )
             status['resolved_path'] = resolved_path
             
@@ -835,9 +744,8 @@ def process_manifest_data(manifest_path):
         manifest_path: Path to the data_manifest.yaml file
     """
     try:
-        # Show manifest processing status only in debug mode
-        if is_debug_mode():
-            st.info(f"🔧 Starting manifest processing: '{manifest_path}'")
+        # Force debug output for troubleshooting
+        st.info(f"🐛 DEBUG: Starting manifest processing: '{manifest_path}'")
         
         # Load and validate manifest
         manifest = load_data_manifest(manifest_path)
@@ -845,8 +753,7 @@ def process_manifest_data(manifest_path):
             st.error(f"❌ Failed to load manifest from: '{manifest_path}'")
             return
         
-        if is_debug_mode():
-            st.info("✅ Manifest loaded successfully")
+        st.info("🐛 DEBUG: Manifest loaded successfully")
             
         # Extract currency and client info from manifest
         currency = manifest.get('currency', 'nok')
@@ -881,9 +788,8 @@ def process_manifest_data(manifest_path):
         
         available_sources, detailed_status = get_manifest_data_sources(manifest_path, current_version, file_mtime)
         
-        if is_debug_mode():
-            st.info(f"🐛 Debug - Found {len(available_sources)} available sources: {available_sources}")
-            st.info(f"🐛 Debug - Detailed status for {len(detailed_status)} configured sources")
+        st.info(f"🐛 DEBUG: Found {len(available_sources)} available sources: {available_sources}")
+        st.info(f"🐛 DEBUG: Detailed status for {len(detailed_status)} configured sources")
         
         # Store debug information in session state
         st.session_state.data_loading_method = "manifest"
@@ -895,17 +801,16 @@ def process_manifest_data(manifest_path):
             'client_id': client_id
         }
         
-        # Show detailed status only in debug mode
-        if is_debug_mode():
-            st.info("🔍 File Resolution Status:")
-            for source_name, status in detailed_status.items():
-                icon = "✅" if status['exists'] else "❌"
-                st.info(f"{icon} **{source_name}**")
-                st.info(f"  - Configured: `{status['configured_path']}`")
-                st.info(f"  - Resolved: `{status['resolved_path']}`")
-                st.info(f"  - Exists: {status['exists']}")
-                if status['error']:
-                    st.error(f"  - Error: {status['error']}")
+        # Force show detailed status for troubleshooting
+        st.info("🐛 DEBUG: File Resolution Status:")
+        for source_name, status in detailed_status.items():
+            icon = "✅" if status['exists'] else "❌"
+            st.info(f"{icon} **{source_name}**")
+            st.info(f"  - Configured: `{status['configured_path']}`")
+            st.info(f"  - Resolved: `{status['resolved_path']}`")
+            st.info(f"  - Exists: {status['exists']}")
+            if status['error']:
+                st.error(f"  - Error: {status['error']}")
         
         if not available_sources:
             st.error("No data files found for any configured data sources.")

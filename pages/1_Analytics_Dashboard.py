@@ -1,10 +1,10 @@
 import streamlit as st
 import glob
-import time
+import os
 
 # Import UI functions
 from ui import render_dashboard
-from ui.parquet_processor import process_parquet_data_from_path, process_manifest_data, is_debug_mode
+from ui.parquet_processor import process_parquet_data_from_path
 
 # Set page configuration
 st.set_page_config(
@@ -55,10 +55,50 @@ def find_manifest_file():
     manifest_files = glob.glob("data_manifest.yaml") + glob.glob("data_manifest.yml")
     return manifest_files[0] if manifest_files else None
 
+def get_data_directory():
+    """Get the appropriate data directory - Railway volume or local"""
+    # Check for Railway volume first
+    if os.path.exists("/data"):
+        return "/data"
+    # Check for local temp directory
+    elif os.path.exists(os.path.expanduser("~/temp_data")):
+        return os.path.expanduser("~/temp_data")
+    # Fallback to local data directory
+    else:
+        return "data"
+
 def find_parquet_file():
-    """Find the first Parquet file in data directory"""
-    parquet_files = glob.glob("data/*.parquet") + glob.glob("data/*.pq")
-    return parquet_files[0] if parquet_files else None
+    """Find main time_records parquet file - REQUIRED for app to work"""
+    data_dir = get_data_directory()
+    parquet_files = glob.glob(f"{data_dir}/*.parquet") + glob.glob(f"{data_dir}/*.pq")
+    
+    if not parquet_files:
+        return None
+        
+    # Look for time_records files (required for main data)
+    time_records_files = [f for f in parquet_files if 'time_records' in f.lower()]
+    if time_records_files:
+        # Return newest if multiple files
+        return max(time_records_files, key=lambda f: os.path.getmtime(f))
+    
+    # No fallback - time_records is required
+    return None
+
+def find_planned_parquet_file():
+    """Find optional planned parquet file"""
+    data_dir = get_data_directory()
+    parquet_files = glob.glob(f"{data_dir}/*.parquet") + glob.glob(f"{data_dir}/*.pq")
+    
+    if not parquet_files:
+        return None
+        
+    # Look for planned files (optional)
+    planned_files = [f for f in parquet_files if 'planned' in f.lower()]
+    if planned_files:
+        # Return newest if multiple files
+        return max(planned_files, key=lambda f: os.path.getmtime(f))
+    
+    return None
 
 def is_data_loaded():
     """Check if data is loaded and available for analysis"""
@@ -76,6 +116,19 @@ def is_capacity_data_available():
         not getattr(st.session_state.schedule_df, 'empty', True)
     )
 
+def show_data_error():
+    """Show error when required data is missing"""
+    st.markdown("""
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 70vh;">
+        <h1>🥇 Arkemy</h1>
+        <h3>Turn Your Project Data Into Gold</h3>
+        <div style="margin: 40px 0; color: #ff6b6b;">
+            <h4>📊 No Data Found</h4>
+        </div>
+        <p style="color: #666;">Please upload time records data via the Admin panel</p>
+    </div>
+    """, unsafe_allow_html=True)
+
 def show_loading_screen():
     """Show a clean loading screen"""
     st.markdown("""
@@ -90,68 +143,63 @@ def show_loading_screen():
     """, unsafe_allow_html=True)
 
 def auto_load_data():
-    """Automatically load data from data directory or manifest on first run"""
+    """Automatically load data from data directory on first run"""
+    print("🔍 TERMINAL: auto_load_data() called")
     if st.session_state.data_loading_attempted:
+        print("🔍 TERMINAL: Data loading already attempted, skipping")
         return
     
+    print("🔍 TERMINAL: Starting data loading process...")
     st.session_state.data_loading_attempted = True
     
-    # Show loading progress with minimal debug info
-    data_version = st.session_state.get('data_version', 'adjusted')
+    # Check what data directory we're using
+    data_dir = get_data_directory()
+    print(f"🔍 TERMINAL: Using data directory: {data_dir}")
     
-    # Show debug info only if debug mode is enabled
-    if is_debug_mode():
-        st.info(f"🔍 Starting data loading with version: {data_version}")
-        
-        # Show what files exist in the data directory
-        data_files = glob.glob("data/*.parquet") + glob.glob("data/*.pq")
-        st.info(f"📁 Found {len(data_files)} parquet files in data directory")
-        for f in sorted(data_files):
-            st.info(f"  • {f}")
-    
-    # First, try to find and use manifest file
-    manifest_path = find_manifest_file()
-    if manifest_path:
-        if is_debug_mode():
-            st.info(f"📄 Found manifest file: {manifest_path}")
-            st.info("📥 Attempting to load data using manifest...")
-        try:
-            process_manifest_data(manifest_path)
-            return
-        except Exception as e:
-            st.error(f"❌ Error loading data from manifest: {str(e)}")
-            if is_debug_mode():
-                import traceback
-                st.error(f"🔍 Full error details: {traceback.format_exc()}")
-            # Fall back to parquet file loading
-            st.info("🔄 Falling back to parquet file loading...")
+    # Show what files exist in the data directory
+    if os.path.exists(data_dir):
+        all_files = os.listdir(data_dir)
+        print(f"🔍 TERMINAL: Found {len(all_files)} total files in {data_dir}")
+        for f in sorted(all_files):
+            print(f"🔍 TERMINAL:   • {f}")
+            
+        parquet_files = [f for f in all_files if f.endswith(('.parquet', '.pq'))]
+        print(f"🔍 TERMINAL: Parquet files: {parquet_files}")
     else:
-        if is_debug_mode():
-            st.info("📄 No manifest file found, trying parquet fallback")
-    
-    # Fallback: Find single parquet file (backward compatibility)
-    parquet_path = find_parquet_file()
-    if not parquet_path:
-        # No data files found - show error message
-        st.error("📂 No parquet files found in /data directory")
-        st.markdown("""
-        **To use Arkemy, place your parquet data files in the `/data` directory:**
-        - For single dataset: `data/your_data_NOK.parquet`
-        - For dual datasets: `data/your_data_regular.parquet` and `data/your_data_adjusted.parquet`
-        - Or use a `data_manifest.yaml` file to configure multiple data sources
-        """)
+        print(f"🔍 TERMINAL: Data directory {data_dir} doesn't exist!")
         return
     
-    # Process the parquet file
-    st.info(f"📄 Using fallback parquet file: {parquet_path}")
-    st.info("📥 Attempting to load data from single parquet file...")
+    # Look for required main data (time_records)
+    print("🔍 TERMINAL: Looking for main time_records data...")
+    main_parquet_path = find_parquet_file()
+    print(f"🔍 TERMINAL: find_parquet_file() returned: {main_parquet_path}")
+    
+    if not main_parquet_path:
+        # Show clear error - main data is required
+        st.error("📊 No time records data found in data directory")
+        st.info("Please upload a file named like: *time_records*.parquet via Admin panel")
+        print(f"🔍 TERMINAL: No time_records files found in {data_dir} directory")
+        return
+    
+    # Process the main parquet file
+    print(f"🔍 TERMINAL: Loading main data from: {main_parquet_path}")
     try:
-        process_parquet_data_from_path(parquet_path)
-        st.success("✅ Data loaded successfully from parquet file!")
+        process_parquet_data_from_path(main_parquet_path)
+        print("🔍 TERMINAL: Main data loaded successfully!")
+        
+        # Try to load optional planned data
+        planned_parquet_path = find_planned_parquet_file()
+        if planned_parquet_path:
+            print(f"🔍 TERMINAL: Found planned data: {planned_parquet_path}")
+            # TODO: Add planned data loading here when needed
+        else:
+            print("🔍 TERMINAL: No planned data found (optional)")
+            
     except Exception as e:
         st.error(f"❌ Error loading data from parquet file: {str(e)}")
+        print(f"🔍 TERMINAL: Error loading data: {str(e)}")
         import traceback
-        st.error(f"🔍 Full error details: {traceback.format_exc()}")
+        print(f"🔍 TERMINAL: Full error details: {traceback.format_exc()}")
 
 def render_currency_setup():
     """Render error message if currency couldn't be auto-detected"""
@@ -170,107 +218,25 @@ def render_currency_setup():
         st.session_state.currency_selected = True
         st.rerun()
 
-def show_data_loading_debug():
-    """Show comprehensive data loading debug information"""
-    with st.sidebar.expander("🐛 Data Loading Debug", expanded=True):
-        
-        # Add manual cache clear button
-        if st.button("🗑️ Clear Cache", help="Clear manifest cache and force reload"):
-            from ui.parquet_processor import clear_manifest_cache
-            clear_manifest_cache()
-            st.success("Cache cleared! Reloading...")
-            time.sleep(1)  # Brief pause to show message
-            st.rerun()
-        
-        # Show loading method used
-        loading_method = getattr(st.session_state, 'data_loading_method', 'unknown')
-        method_icons = {
-            'manifest': '📁',
-            'single_file': '📄',
-            'manifest_failed': '❌',
-            'single_file_failed': '❌',
-            'unknown': '❓'
-        }
-        
-        st.write(f"**Loading Method:** {method_icons.get(loading_method, '❓')} {loading_method}")
-        
-        # Show manifest debug info if available
-        debug_info = getattr(st.session_state, 'manifest_debug_info', {})
-        if debug_info:
-            
-            if 'error' in debug_info:
-                st.error(f"Error: {debug_info['error']}")
-            
-            if 'manifest_path' in debug_info:
-                st.write(f"**Manifest:** `{debug_info['manifest_path']}`")
-                
-            if 'parquet_path' in debug_info:
-                st.write(f"**Parquet:** `{debug_info['parquet_path']}`")
-                
-            if 'currency' in debug_info:
-                st.write(f"**Currency:** {debug_info['currency']}")
-                
-            if 'available_sources' in debug_info:
-                sources = debug_info['available_sources']
-                st.write(f"**Available Sources:** {len(sources)}")
-                for source in sources:
-                    st.write(f"  ✅ {source}")
-                
-            # Show detailed file resolution status
-            if 'detailed_status' in debug_info:
-                st.write("**File Resolution:**")
-                for source_name, status in debug_info['detailed_status'].items():
-                    icon = "✅" if status['exists'] else "❌"
-                    st.write(f"{icon} **{source_name}**")
-                    if not status['exists']:
-                        st.write(f"    Path: `{status['configured_path']}`")
-                        if status.get('error'):
-                            st.write(f"    Error: {status['error']}")
-                        elif status['resolved_path']:
-                            st.write(f"    Resolved: `{status['resolved_path']}`")
-
-def show_data_status():
-    """Show data loading status for debugging"""
-    with st.sidebar.expander("📊 Data Status"):
-        st.write("**Main Data:**")
-        st.write(f"- CSV loaded: {st.session_state.csv_loaded}")
-        st.write(f"- Main DF shape: {getattr(st.session_state.transformed_df, 'shape', 'None')}")
-        
-        st.write("**Planned Data:**")
-        st.write(f"- Planned loaded: {st.session_state.planned_csv_loaded}")
-        st.write(f"- Planned DF shape: {getattr(st.session_state.transformed_planned_df, 'shape', 'None')}")
-        
-        st.write("**Capacity Data:**")
-        st.write(f"- Schedule loaded: {st.session_state.schedule_loaded}")
-        st.write(f"- Schedule DF shape: {getattr(st.session_state.schedule_df, 'shape', 'None')}")
-        st.write(f"- Absence loaded: {st.session_state.absence_loaded}")
-        st.write(f"- Absence DF shape: {getattr(st.session_state.absence_df, 'shape', 'None')}")
-        st.write(f"- Capacity summary loaded: {st.session_state.capacity_summary_loaded}")
-        st.write(f"- Capacity summary DF shape: {getattr(st.session_state.capacity_summary_df, 'shape', 'None')}")
-        st.write(f"- Config available: {st.session_state.capacity_config is not None}")
-
-    if st.sidebar.button("View Capacity Data"):
-        if st.session_state.get('schedule_df') is not None:
-            st.write("**Schedule Data:**")
-            st.dataframe(st.session_state.schedule_df.head())
-        
-        if st.session_state.get('capacity_summary_df') is not None:
-            st.write("**Capacity Summary:**")
-            st.dataframe(st.session_state.capacity_summary_df.head())
 
 # Analytics Dashboard main logic
+print("🔍 TERMINAL: Analytics Dashboard main logic executing")
+print(f"🔍 TERMINAL: is_data_loaded() = {is_data_loaded()}")
+
 if not is_data_loaded():
+    print("🔍 TERMINAL: Data not loaded, calling auto_load_data()")
     # Auto-load data on first run
     auto_load_data()
     
     # Show loading screen if data still not loaded
     if not is_data_loaded():
+        print("🔍 TERMINAL: Data still not loaded after auto_load_data, showing loading screen")
         show_loading_screen()
+    else:
+        print("🔍 TERMINAL: Data loaded successfully after auto_load_data")
+        # Render the dashboard with newly loaded data
+        render_dashboard()
 else:
-    # Show debug information in sidebar if debug mode is enabled
-    if is_debug_mode():
-        show_data_loading_debug()
-        show_data_status()
-    
+    print("🔍 TERMINAL: Data already loaded, showing dashboard")
     # Render the dashboard with data
     render_dashboard()

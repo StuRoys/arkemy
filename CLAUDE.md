@@ -36,11 +36,46 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. **Test locally first** before any main branch merge
 4. **Ask for confirmation** if production intent is unclear
 5. **Handle all git commands** - user never needs to know Git
+6. **NEVER deploy without explicit permission** - see Deployment Rules below
 
 ### Session Start Checklist
 - [ ] Check current branch: `git rev-parse --abbrev-ref HEAD`
 - [ ] Switch to develop if not already: `git checkout develop`
 - [ ] Proceed with development work
+
+## 🚨 DEPLOYMENT RULES - CRITICAL
+**Railway deployments automatically commit and push to Git - NEVER deploy without permission**
+
+### Testing Workflow (MANDATORY)
+1. **ALWAYS test locally first**: `streamlit run main.py`
+2. **Get explicit user permission** before ANY deployment
+3. **Separate confirmations required**:
+   - "Can I commit these changes to Git?"
+   - "Can I deploy to Railway?"
+
+### Railway Deployment Commands
+⚠️ **WARNING**: `railway up` automatically commits and pushes to Git repository
+
+**NEVER run these without explicit user permission:**
+- `railway up` - Commits, pushes to Git, AND deploys
+- `railway deploy` - May also trigger Git operations
+- Any Railway deployment command
+
+### Safe Testing Commands
+**These are safe to run without permission:**
+- `streamlit run main.py` - Local testing only
+- `railway logs` - View deployment logs
+- `railway status` - Check deployment status
+- Git read operations (`git status`, `git log`, etc.)
+
+### Deployment Approval Process
+Before ANY Railway deployment:
+1. Show user what changes will be committed
+2. Ask: "Ready to commit and deploy these changes?"
+3. Wait for explicit "yes" or similar confirmation
+4. Only then run deployment commands
+
+**REMEMBER**: User wants to test first, commit second, deploy third - all with explicit approval
 
 ## Common Development Commands
 
@@ -53,6 +88,44 @@ streamlit run main.py
 ```bash
 pip install -r requirements.txt
 ```
+
+## Railway MCP Commands (Available via MCP Server)
+
+**Project Management:**
+- `mcp__railway__list-projects` - List all Railway projects
+- `mcp__railway__create-project-and-link` - Create and link a project to current directory
+
+**Service Management:**
+- `mcp__railway__list-services` - List services in a project
+- `mcp__railway__link-service` - Link a service to current directory
+- `mcp__railway__deploy` - Deploy a service
+- `mcp__railway__deploy-template` - Deploy a template from Railway's library
+
+**Environment Management:**
+- `mcp__railway__create-environment` - Create a new environment
+- `mcp__railway__link-environment` - Link an environment to current directory
+
+**Configuration & Variables:**
+- `mcp__railway__list-variables` - List environment variables
+- `mcp__railway__set-variables` - Set environment variables
+- `mcp__railway__generate-domain` - Generate a railway.app domain
+
+**Monitoring:**
+- `mcp__railway__get-logs` - Retrieve build or deployment logs
+
+**MCP Server Setup:**
+```json
+{
+  "mcpServers": {
+    "railway-mcp-server": {
+      "command": "npx",
+      "args": ["-y", "@railway/mcp-server"]
+    }
+  }
+}
+```
+
+**Note:** If Railway MCP tools are not available, restart Claude Code to reload MCP servers.
 
 ## Architecture Overview
 
