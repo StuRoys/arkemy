@@ -2,18 +2,6 @@ import streamlit as st
 import glob
 import os
 
-# ==========================================
-# AUTHENTICATION CHECK - MUST COME FIRST
-# ==========================================
-
-# Check if user is authenticated
-authentication_status = st.session_state.get('authentication_status')
-if authentication_status != True:
-    # User is not authenticated - redirect to main page
-    st.error("🔒 Access denied. Please log in through the main page.")
-    st.markdown("[👉 Go to Login Page](/?page=main)")
-    st.stop()
-
 # Import UI functions
 from ui import render_dashboard
 from ui.parquet_processor import process_parquet_data_from_path

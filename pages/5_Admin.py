@@ -1,18 +1,5 @@
 # pages/5_Admin.py
 import streamlit as st
-
-# ==========================================
-# AUTHENTICATION CHECK - MUST COME FIRST
-# ==========================================
-
-# Check if user is authenticated
-authentication_status = st.session_state.get('authentication_status')
-if authentication_status != True:
-    # User is not authenticated - redirect to main page
-    st.error("🔒 Access denied. Please log in through the main page.")
-    st.markdown("[👉 Go to Login Page](/?page=main)")
-    st.stop()
-
 import os
 import sys
 from datetime import datetime
