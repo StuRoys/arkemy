@@ -349,7 +349,7 @@ def render_sidebar_filters(df, planned_df=None):
     display_filter_badges(filter_settings, location="sidebar")
     
     # Dataset version selector
-    st.sidebar.markdown("---")  # Add a separator
+    st.sidebar.markdown("---")
     
     # Detect available datasets
     dataset_info = detect_available_datasets()
@@ -381,7 +381,6 @@ def render_sidebar_filters(df, planned_df=None):
             else:
                 st.sidebar.info("💰 Using Regular Values (only dataset available)")
         elif len(dataset_info['available_versions']) == 0:
-            st.sidebar.warning("⚠️ No datasets found")
             selected_version = "adjusted"  # Fallback
     
     # Trigger reload if version changed
@@ -404,18 +403,5 @@ def render_sidebar_filters(df, planned_df=None):
         st.session_state.data_loading_attempted = False
         st.rerun()
     
-    
-    # Debug toggle at the bottom of sidebar
-    st.sidebar.markdown("---")  # Add separator
-    
-    # Initialize debug mode if not set
-    if 'debug_mode' not in st.session_state:
-        st.session_state.debug_mode = False
-    
-    # Debug toggle button
-    debug_label = "🐛 Debug: ON" if st.session_state.debug_mode else "🐛 Debug: OFF"
-    if st.sidebar.button(debug_label, help="Toggle debug information display"):
-        st.session_state.debug_mode = not st.session_state.debug_mode
-        st.rerun()
         
     return filtered_df, filtered_planned_df, filter_settings

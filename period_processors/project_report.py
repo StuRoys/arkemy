@@ -8,9 +8,21 @@ from period_charts.project_hours import render_project_hours_chart
 from period_charts.project_fees import render_project_fees_chart
 from period_charts.project_rate import render_project_rate_chart
 
+def get_data_directory():
+    """Get the appropriate data directory - Railway volume or local"""
+    # Check for Railway volume first
+    if os.path.exists("/data"):
+        return "/data"
+    # Check for local temp directory
+    elif os.path.exists(os.path.expanduser("~/temp_data")):
+        return os.path.expanduser("~/temp_data")
+    # Fallback to local data directory
+    else:
+        return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+
 def try_autoload_project_data():
-    """Try to autoload project data from /data directory."""
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+    """Try to autoload project data from data directory."""
+    data_dir = get_data_directory()
     
     # Look for CSV files that might contain project data
     # Common patterns: project*.csv, prosjekt*.csv (Norwegian)

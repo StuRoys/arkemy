@@ -13,8 +13,20 @@ st.set_page_config(
 st.title("🏗️ Hrs SQM Phase Analysis")
 st.markdown("Calculate hours per square meter across different project phases")
 
+def get_data_directory():
+    """Get the appropriate data directory - Railway volume or local"""
+    # Check for Railway volume first
+    if os.path.exists("/data"):
+        return "/data"
+    # Check for local temp directory
+    elif os.path.exists(os.path.expanduser("~/temp_data")):
+        return os.path.expanduser("~/temp_data")
+    # Fallback to local data directory
+    else:
+        return "data"
+
 # Auto-load CSV file from data folder
-data_dir = "data"
+data_dir = get_data_directory()
 csv_pattern = os.path.join(data_dir, "*sqm*.csv")
 csv_files = glob.glob(csv_pattern)
 
