@@ -124,7 +124,7 @@ def process_parquet_file(uploaded_file, file_type=None):
                 with col3:
                     st.metric("Projects", transformed_df['project_number'].nunique())
                 
-                else:
+            else:
                 transformed_df = transform_csv(df)
                 st.session_state.transformed_df = transformed_df
                 st.session_state.csv_loaded = True
