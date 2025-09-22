@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-from utils.data_validation import validate_csv_schema, transform_csv, display_validation_results
 
 # Set page configuration
 st.set_page_config(
@@ -27,271 +26,210 @@ if 'transformed_df' not in st.session_state:
 if 'currency' not in st.session_state:
     st.session_state.currency = 'nok'
 
-def detect_file_type(df, filename):
-    """Detect if file contains main data or planned data based on filename"""
-    filename_lower = filename.lower()
-    
-    if 'time_records' in filename_lower:
-        return "main"
-    elif 'planned_records' in filename_lower:
-        return "planned"
-    else:
-        return "main"
+def render_data_loading_interface():
+    """Render the new hybrid data loading interface."""
+    from utils.unified_data_loader import load_data_hybrid, load_data_from_upload
 
-def process_parquet_file(uploaded_file, file_type=None):
-    """Process uploaded parquet file with validation"""
-    try:
-        # Read parquet file
-        df = pd.read_parquet(uploaded_file)
-        
-        # Auto-detect file type if not specified
-        if file_type is None:
-            file_type = detect_file_type(df, uploaded_file.name)
-        
-        # Always show file analysis - critical for debugging
-        st.info(f"📁 **File:** {uploaded_file.name}")
-        st.info(f"🔍 **Detected Type:** {file_type}")
-        st.info(f"📏 **Shape:** {df.shape[0]:,} rows, {df.shape[1]} columns")
-        
-        with st.expander("🔍 **Column Analysis**", expanded=True):
-            st.write("**All Columns Found:**")
-            for i, col in enumerate(df.columns, 1):
-                st.write(f"{i:2d}. `{col}`")
-            
-            st.markdown("---")
-            
-            # Show what we're looking for
-            if file_type == "planned":
-                st.write("**Looking for (Planned Data):**")
-                planned_required = ["record_date", "person_name", "project_number", "planned_hours"]
-                planned_optional = ["planned_hourly_rate"]
-                
-                st.write("*Required:*")
-                for col in planned_required:
-                    found = col in [c.lower() for c in df.columns]
-                    status = "✅" if found else "❌"
-                    st.write(f"{status} `{col}`")
-                
-                st.write("*Optional:*")
-                for col in planned_optional:
-                    found = col in [c.lower() for c in df.columns]
-                    status = "✅" if found else "⚠️"
-                    st.write(f"{status} `{col}`")
-            else:
-                st.write("**Looking for (Main Data):**")
-                main_required = ["record_date", "person_name", "project_number", "hours_used"]
-                main_common = ["hours_billable", "fee_record", "cost_hour", "billable_rate_record"]
-                
-                st.write("*Required:*")
-                for col in main_required:
-                    # Check both exact match and case variations
-                    found = any(col.lower() == c.lower() for c in df.columns)
-                    status = "✅" if found else "❌"
-                    st.write(f"{status} `{col}`")
-                
-                st.write("*Common:*")
-                for col in main_common:
-                    found = any(col.lower() == c.lower() for c in df.columns)
-                    status = "✅" if found else "⚠️"
-                    st.write(f"{status} `{col}`")
-        
-        # Validate schema based on detected type
-        st.subheader(f"📋 Schema Validation - {file_type.title()} Data")
-        
-        if file_type == "planned":
-            from utils.data_validation import validate_planned_schema, transform_planned_csv, display_planned_validation_results
-            validation_results = validate_planned_schema(df)
-            display_planned_validation_results(validation_results)
-        else:
-            validation_results = validate_csv_schema(df)
-            display_validation_results(validation_results)
-        
-        if validation_results["is_valid"]:
-            # Transform and store data based on type
-            if file_type == "planned":
-                transformed_df = transform_planned_csv(df)
-                st.session_state.transformed_planned_df = transformed_df
-                st.session_state.planned_csv_loaded = True
-                st.success(f"✅ Planned data processed successfully! {transformed_df.shape[0]} rows.")
-                
-                # Show planned data summary
-                st.subheader("📊 Planned Data Summary")
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Total Records", f"{len(transformed_df):,}")
-                with col2:
-                    st.metric("People", transformed_df['person_name'].nunique())
-                with col3:
-                    st.metric("Projects", transformed_df['project_number'].nunique())
-                
-            else:
-                transformed_df = transform_csv(df)
-                st.session_state.transformed_df = transformed_df
-                st.session_state.csv_loaded = True
-                st.success(f"✅ Main data processed successfully! {transformed_df.shape[0]} rows.")
-                
-                # Show main data summary
-                st.subheader("📊 Main Data Summary")
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Total Records", f"{len(transformed_df):,}")
-                with col2:
-                    st.metric("People", transformed_df['person_name'].nunique())
-                with col3:
-                    st.metric("Projects", transformed_df['project_number'].nunique())
-                
-            
-            
+    st.title("📊 Arkemy Analytics Dashboard")
+    st.markdown("**Professional project analytics powered by schema-driven data processing**")
+
+    # Check if data is already loaded
+    if st.session_state.csv_loaded and st.session_state.transformed_df is not None:
+        render_data_loaded_status()
+        return True
+
+    st.markdown("---")
+    st.subheader("🔄 Data Loading")
+
+    # Get debug mode status
+    debug_mode = is_debug_mode()
+
+    if debug_mode:
+        st.info("🐛 **Debug Mode Enabled** - Detailed validation information will be shown")
+
+    # Try hybrid loading (check volume first)
+    loading_results = load_data_hybrid(show_debug=debug_mode)
+
+    if loading_results['loading_method'] == 'auto_volume':
+        # Data was auto-loaded from volume
+        if loading_results['success']:
+            st.success("🎉 **Data loaded successfully from volume!**")
+            display_loading_results(loading_results)
             return True
         else:
-            st.error(f"❌ {file_type.title()} file validation failed. Please fix the issues above and try again.")
-            return False
-            
-    except Exception as e:
-        st.error(f"❌ Error processing {uploaded_file.name}: {str(e)}")
-        return False
+            st.error(f"❌ **Auto-loading failed**: {loading_results.get('error', 'Unknown error')}")
 
-def show_uploader():
-    """Show the multi-file uploader interface"""
-    st.title("🥇 Arkemy Analytics Dashboard")
-    st.markdown("##### Multi-File Parquet Uploader")
-    
-    st.info("📋 **Upload your data files:** You can upload both main timesheet data and planned hours data. Files are automatically detected based on content and filename.")
-    
-    st.markdown("---")
-    
-    # Multi-file uploader
-    st.subheader("📤 Upload Your Parquet Files")
-    uploaded_files = st.file_uploader(
-        "Choose parquet files",
+    elif loading_results['loading_method'] == 'upload_required':
+        # No files in volume, show upload interface
+        return render_upload_interface(debug_mode)
+
+    return False
+
+def render_upload_interface(debug_mode: bool) -> bool:
+    """Render file upload interface."""
+    from utils.unified_data_loader import load_data_from_upload
+
+    st.markdown("### 📤 Upload Data File")
+    st.markdown("Upload a parquet file containing your time tracking data. The system supports unified files with multiple record types.")
+
+    # File uploader
+    uploaded_file = st.file_uploader(
+        "Choose a parquet file",
         type=['parquet', 'pq'],
-        accept_multiple_files=True,
-        help="Upload parquet files containing your project data. Main data and planned data will be automatically detected."
+        help="Upload a .parquet file with time tracking and/or planned hours data"
     )
-    
-    if uploaded_files:
-        st.subheader("📁 Files Ready for Processing")
-        
-        # Show file list with detected types
-        file_info = []
-        for uploaded_file in uploaded_files:
-            # Quick column check to detect type
-            try:
-                df_preview = pd.read_parquet(uploaded_file)
-                detected_type = detect_file_type(df_preview, uploaded_file.name)
-                file_info.append({
-                    'file': uploaded_file,
-                    'name': uploaded_file.name,
-                    'size': uploaded_file.size,
-                    'type': detected_type,
-                    'rows': len(df_preview),
-                    'columns': len(df_preview.columns)
-                })
-            except Exception as e:
-                file_info.append({
-                    'file': uploaded_file,
-                    'name': uploaded_file.name,
-                    'size': uploaded_file.size,
-                    'type': 'error',
-                    'error': str(e)
-                })
-        
-        # Display file information table
-        for i, info in enumerate(file_info):
-            col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
-            
-            with col1:
-                if info['type'] == 'error':
-                    st.error(f"❌ {info['name']} - Error: {info.get('error', 'Unknown error')}")
-                else:
-                    type_icon = "📊" if info['type'] == 'main' else "📈"
-                    st.info(f"{type_icon} **{info['name']}** - {info['type'].title()} Data")
-            
-            with col2:
-                if info['type'] != 'error':
-                    st.text(f"{info['size']:,} bytes")
-            
-            with col3:
-                if info['type'] != 'error':
-                    st.text(f"{info['rows']:,} rows")
-            
-            with col4:
-                if info['type'] != 'error':
-                    st.text(f"{info['columns']} cols")
-        
-        st.markdown("---")
-        
-        # Process all files button
-        if st.button("🔄 Process All Files", type="primary", use_container_width=True):
-            success_count = 0
-            total_files = len([f for f in file_info if f['type'] != 'error'])
-            
-            if total_files == 0:
-                st.error("❌ No valid files to process!")
-                return
-            
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            for i, info in enumerate(file_info):
-                if info['type'] == 'error':
-                    continue
-                    
-                status_text.text(f"Processing {info['name']}...")
-                progress_bar.progress((i + 1) / total_files)
-                
-                with st.spinner(f"Processing {info['name']}..."):
-                    success = process_parquet_file(info['file'], info['type'])
-                    if success:
-                        success_count += 1
-            
-            progress_bar.progress(1.0)
-            status_text.text("Processing complete!")
-            
-            if success_count == total_files:
-                st.success(f"✅ All {success_count} files processed successfully!")
-                st.balloons()
-                st.rerun()
-            elif success_count > 0:
-                st.warning(f"⚠️ {success_count} of {total_files} files processed successfully. Check errors above.")
-                st.rerun()
+
+    if uploaded_file is not None:
+        st.info(f"📁 **File selected**: `{uploaded_file.name}` ({round(len(uploaded_file.getvalue()) / (1024*1024), 2)} MB)")
+
+        if st.button("🚀 Process File", type="primary"):
+            with st.spinner("Processing file..."):
+                loading_results = load_data_from_upload(uploaded_file, debug_mode)
+
+            if loading_results['success']:
+                st.success("🎉 **File processed successfully!**")
+                display_loading_results(loading_results)
+                return True
             else:
-                st.error("❌ No files were processed successfully. Please check the errors above.")
-    else:
-        st.info("👆 Select parquet files to begin processing")
+                st.error(f"❌ **File processing failed**: {loading_results.get('error', 'Unknown error')}")
 
-def show_dashboard():
-    """Show the main dashboard when data is loaded"""
-    from ui import render_dashboard
-    render_dashboard()
+    return False
 
-# Main application logic
-has_main_data = st.session_state.get('csv_loaded', False) and st.session_state.get('transformed_df') is not None
-has_planned_data = st.session_state.get('planned_csv_loaded', False) and st.session_state.get('transformed_planned_df') is not None
+def display_loading_results(results: dict):
+    """Display the results of data loading."""
 
-if not has_main_data:
-    # Show uploader - need main data to proceed
-    if has_planned_data:
-        st.warning("📈 Planned data loaded, but main timesheet data is required to access the dashboard.")
-    show_uploader()
-else:
-    # Show dashboard with data
-    try:
-        show_dashboard()
-    except Exception as e:
-        st.error(f"❌ Error loading dashboard: {str(e)}")
-        
-        # Fallback: show uploader again
-        st.warning("Falling back to uploader due to dashboard error.")
-        show_uploader()
-    
-    # Add option to upload new data
-    with st.sidebar:
-        st.markdown("### 🔄 Data Management")
-        if st.button("Upload New File"):
-            # Clear existing data
+    # Currency and method info
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("Currency Detected", results['currency'].upper())
+
+    with col2:
+        method_display = {
+            'auto_volume': 'Auto-Loaded',
+            'upload': 'Uploaded',
+            'manual': 'Manual'
+        }
+        st.metric("Loading Method", method_display.get(results['loading_method'], 'Unknown'))
+
+    with col3:
+        total_records = sum(len(df) for df in results['processed_data'].values())
+        st.metric("Total Records", f"{total_records:,}")
+
+    # Record type breakdown
+    if results['processed_data']:
+        st.markdown("### 📊 Data Summary")
+
+        for record_type, df in results['processed_data'].items():
+            validation = results['validation_results'].get(record_type, {})
+
+            with st.expander(f"📋 {record_type.replace('_', ' ').title()} ({len(df):,} records)", expanded=True):
+
+                # Validation status
+                if validation.get('is_valid', False):
+                    st.success("✅ Schema validation passed")
+                else:
+                    st.warning("⚠️ Schema validation had issues")
+
+                # Quick stats
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Records", f"{len(df):,}")
+                with col2:
+                    if 'person_name' in df.columns:
+                        st.metric("People", df['person_name'].nunique())
+                with col3:
+                    if 'project_number' in df.columns:
+                        st.metric("Projects", df['project_number'].nunique())
+
+                # Sample data
+                if not df.empty:
+                    st.markdown("**Sample Data:**")
+                    # Show key columns only
+                    key_cols = ['record_date', 'person_name', 'project_number']
+                    if record_type == 'time_record':
+                        key_cols.extend(['hours_used', 'hours_billable'])
+                    elif record_type == 'planned_record':
+                        key_cols.extend(['planned_hours'])
+
+                    available_cols = [col for col in key_cols if col in df.columns]
+                    if available_cols:
+                        st.dataframe(df[available_cols].head(), use_container_width=True)
+
+def render_data_loaded_status():
+    """Show status when data is already loaded."""
+    st.success("✅ **Data is loaded and ready for analysis!**")
+
+    # Quick stats
+    df = st.session_state.transformed_df
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("Total Records", f"{len(df):,}")
+    with col2:
+        st.metric("People", df['person_name'].nunique() if 'person_name' in df.columns else 'N/A')
+    with col3:
+        st.metric("Projects", df['project_number'].nunique() if 'project_number' in df.columns else 'N/A')
+    with col4:
+        st.metric("Currency", st.session_state.currency.upper())
+
+    # Show planned data status if available
+    if st.session_state.get('planned_csv_loaded', False) and st.session_state.transformed_planned_df is not None:
+        planned_df = st.session_state.transformed_planned_df
+        st.info(f"📅 **Planned data also loaded**: {len(planned_df):,} planned records")
+
+    # Option to reload data
+    col1, col2 = st.columns([3, 1])
+    with col2:
+        if st.button("🔄 Reload Data"):
+            # Clear session state to trigger reload
             st.session_state.csv_loaded = False
             st.session_state.transformed_df = None
             st.session_state.planned_csv_loaded = False
             st.session_state.transformed_planned_df = None
             st.rerun()
+
+def main():
+    """Main page logic."""
+
+    # Try to load data
+    data_loaded = render_data_loading_interface()
+
+    if data_loaded and st.session_state.csv_loaded:
+        st.markdown("---")
+
+        # Import and render the main dashboard
+        try:
+            from ui.dashboard import render_dashboard
+            render_dashboard()
+        except ImportError as e:
+            st.error(f"Dashboard import error: {e}")
+            st.info("Dashboard functionality not available. Please check your imports.")
+    else:
+        # Show helpful information while waiting for data
+        st.markdown("---")
+        st.markdown("### 📖 About This Dashboard")
+
+        st.markdown("""
+        **Arkemy Analytics Dashboard** provides comprehensive project analytics including:
+
+        - 📊 **Summary KPIs**: Revenue, hours, profitability metrics
+        - 📈 **Time Trends**: Monthly and yearly performance tracking
+        - 👥 **People Analytics**: Individual and team performance
+        - 📁 **Project Analysis**: Project-level insights and comparisons
+        - 💰 **Customer Analytics**: Revenue and profitability by client
+        - 🏗️ **Phase Analysis**: Project phase performance tracking
+
+        **New Features:**
+        - ✨ **Schema-Driven Loading**: Easy data validation and processing
+        - 🔄 **Auto-Loading**: Automatically loads data from `/data` volume
+        - 📤 **Upload Fallback**: Manual upload when no volume data available
+        - 🎯 **Record Type Support**: Handles both time records and planned hours
+        - 🌍 **Multi-Currency**: Automatic currency detection from filenames
+        """)
+
+if __name__ == "__main__":
+    main()
+else:
+    # When imported as a page, run main function
+    main()
