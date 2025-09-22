@@ -276,12 +276,6 @@ if not has_main_data:
     show_uploader()
 else:
     # Show dashboard with data
-    st.success("📊 Data loaded successfully!")
-    if has_planned_data:
-        st.info("📈 Both main and planned data are available for analysis.")
-    else:
-        st.info("📊 Main data available. Upload planned data for forecasting features.")
-    
     try:
         show_dashboard()
     except Exception as e:
