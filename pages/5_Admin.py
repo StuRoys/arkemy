@@ -215,6 +215,65 @@ def render_debug_interface():
     st.markdown("### 🐛 Debug Information")
     st.markdown("System and data loading debug information for troubleshooting.")
     
+    # Debug Mode Toggle
+    st.markdown("#### 🔧 Debug Mode Control")
+    
+    # Check current debug mode status
+    current_debug = st.session_state.get('debug_mode', False)
+    env_debug = os.getenv('ARKEMY_DEBUG', '').lower() in ('true', '1', 'yes')
+    
+    col1, col2 = st.columns([2, 3])
+    
+    with col1:
+        # Toggle button
+        new_debug_state = st.toggle(
+            "Enable Debug Mode",
+            value=current_debug,
+            key="debug_toggle",
+            help="Toggle detailed debugging information for data loading and validation"
+        )
+        
+        # Update session state if changed
+        if new_debug_state != current_debug:
+            st.session_state.debug_mode = new_debug_state
+            if new_debug_state:
+                st.success("Debug mode enabled!")
+            else:
+                st.info("Debug mode disabled")
+    
+    with col2:
+        # Status display
+        if env_debug:
+            st.info("🌐 **Environment Override**: Debug mode is enabled via ARKEMY_DEBUG environment variable")
+        elif st.session_state.get('debug_mode', False):
+            st.success("🟢 **Debug Mode**: ON - Detailed validation and loading information will be shown")
+        else:
+            st.info("⚪ **Debug Mode**: OFF - Standard operation")
+    
+    # What debug mode shows
+    with st.expander("ℹ️ What Debug Mode Shows", expanded=False):
+        st.markdown("""
+        When debug mode is enabled, you'll see detailed information during data loading:
+        
+        **Schema Validation:**
+        - ❌ Missing required column headers
+        - ⚠️ Data type validation errors  
+        - 📋 Problematic values with row numbers (up to 10 examples per issue)
+        
+        **File Loading:**
+        - 📁 Which files are being loaded
+        - 📊 Row and column counts
+        - 🔍 Data source filtering details
+        - 📝 Column lists and transformations
+        
+        **Manifest Processing:**
+        - 🗂️ File path resolution details
+        - 📋 Available vs configured data sources
+        - ⚠️ Fallback path attempts
+        """)
+    
+    st.markdown("---")
+    
     # Session State Debug
     st.markdown("#### 📊 Session State")
     with st.expander("View Session State", expanded=False):

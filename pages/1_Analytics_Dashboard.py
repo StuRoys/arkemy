@@ -1,10 +1,5 @@
 import streamlit as st
-import glob
-import os
-
-# Import UI functions
-from ui import render_dashboard
-from ui.parquet_processor import process_parquet_data_from_path
+import pandas as pd
 
 # Set page configuration
 st.set_page_config(
@@ -14,229 +9,227 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize session state variables (same as in main.py for direct page access)
+def is_debug_mode():
+    """Check if debug mode is enabled via environment variable or session state."""
+    import os
+    # Check environment variable first (production override)
+    if os.getenv('ARKEMY_DEBUG', '').lower() in ('true', '1', 'yes'):
+        return True
+    # Fall back to session state for development
+    return st.session_state.get('debug_mode', False)
+
+# Initialize session state variables
 if 'csv_loaded' not in st.session_state:
     st.session_state.csv_loaded = False
 if 'transformed_df' not in st.session_state:
     st.session_state.transformed_df = None
 if 'currency' not in st.session_state:
-    st.session_state.currency = 'nok'  # Default to Norwegian krone
-if 'currency_selected' not in st.session_state:
-    st.session_state.currency_selected = False
-if 'planned_csv_loaded' not in st.session_state:
-    st.session_state.planned_csv_loaded = False
-if 'transformed_planned_df' not in st.session_state:
-    st.session_state.transformed_planned_df = None
-if 'active_tab' not in st.session_state:
-    st.session_state.active_tab = 0
-if 'data_loading_attempted' not in st.session_state:
-    st.session_state.data_loading_attempted = False
-if 'show_uploader' not in st.session_state:
-    st.session_state.show_uploader = False
+    st.session_state.currency = 'nok'
 
-# Initialize capacity-related session state variables
-if 'schedule_loaded' not in st.session_state:
-    st.session_state.schedule_loaded = False
-if 'schedule_df' not in st.session_state:
-    st.session_state.schedule_df = None
-if 'absence_loaded' not in st.session_state:
-    st.session_state.absence_loaded = False
-if 'absence_df' not in st.session_state:
-    st.session_state.absence_df = None
-if 'capacity_config' not in st.session_state:
-    st.session_state.capacity_config = None
-if 'capacity_summary_loaded' not in st.session_state:
-    st.session_state.capacity_summary_loaded = False
-if 'capacity_summary_df' not in st.session_state:
-    st.session_state.capacity_summary_df = None
+def render_data_loading_interface():
+    """Render the new hybrid data loading interface."""
+    from utils.unified_data_loader import load_data_hybrid, load_data_from_upload
 
-def find_manifest_file():
-    """Find data manifest file in project root"""
-    manifest_files = glob.glob("data_manifest.yaml") + glob.glob("data_manifest.yml")
-    return manifest_files[0] if manifest_files else None
+    st.title("📊 Arkemy Analytics Dashboard")
+    st.markdown("**Professional project analytics powered by schema-driven data processing**")
 
-def get_data_directory():
-    """Get the appropriate data directory - Railway volume or local"""
-    # Check for Railway volume first
-    if os.path.exists("/data"):
-        return "/data"
-    # Check for local temp directory
-    elif os.path.exists(os.path.expanduser("~/temp_data")):
-        return os.path.expanduser("~/temp_data")
-    # Fallback to local data directory
-    else:
-        return "data"
+    # Check if data is already loaded
+    if st.session_state.csv_loaded and st.session_state.transformed_df is not None:
+        render_data_loaded_status()
+        return True
 
-def find_parquet_file():
-    """Find main time_records parquet file - REQUIRED for app to work"""
-    data_dir = get_data_directory()
-    parquet_files = glob.glob(f"{data_dir}/*.parquet") + glob.glob(f"{data_dir}/*.pq")
-    
-    if not parquet_files:
-        return None
-        
-    # Look for time_records files (required for main data)
-    time_records_files = [f for f in parquet_files if 'time_records' in f.lower()]
-    if time_records_files:
-        # Return newest if multiple files
-        return max(time_records_files, key=lambda f: os.path.getmtime(f))
-    
-    # No fallback - time_records is required
-    return None
+    st.markdown("---")
+    st.subheader("🔄 Data Loading")
 
-def find_planned_parquet_file():
-    """Find optional planned parquet file"""
-    data_dir = get_data_directory()
-    parquet_files = glob.glob(f"{data_dir}/*.parquet") + glob.glob(f"{data_dir}/*.pq")
-    
-    if not parquet_files:
-        return None
-        
-    # Look for planned files (optional)
-    planned_files = [f for f in parquet_files if 'planned' in f.lower()]
-    if planned_files:
-        # Return newest if multiple files
-        return max(planned_files, key=lambda f: os.path.getmtime(f))
-    
-    return None
+    # Get debug mode status
+    debug_mode = is_debug_mode()
 
-def is_data_loaded():
-    """Check if data is loaded and available for analysis"""
-    return (
-        st.session_state.csv_loaded and 
-        st.session_state.transformed_df is not None and 
-        not getattr(st.session_state.transformed_df, 'empty', True)
-    )
+    if debug_mode:
+        st.info("🐛 **Debug Mode Enabled** - Detailed validation information will be shown")
 
-def is_capacity_data_available():
-    """Check if capacity data is loaded and available for analysis"""
-    return (
-        st.session_state.schedule_loaded and 
-        st.session_state.schedule_df is not None and 
-        not getattr(st.session_state.schedule_df, 'empty', True)
-    )
+    # Try hybrid loading (check volume first)
+    loading_results = load_data_hybrid(show_debug=debug_mode)
 
-def show_data_error():
-    """Show error when required data is missing"""
-    st.markdown("""
-    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 70vh;">
-        <h1>🥇 Arkemy</h1>
-        <h3>Turn Your Project Data Into Gold</h3>
-        <div style="margin: 40px 0; color: #ff6b6b;">
-            <h4>📊 No Data Found</h4>
-        </div>
-        <p style="color: #666;">Please upload time records data via the Admin panel</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-def show_loading_screen():
-    """Show a clean loading screen"""
-    st.markdown("""
-    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 70vh;">
-        <h1>🥇 Arkemy</h1>
-        <h3>Turn Your Project Data Into Gold</h3>
-        <div style="margin: 40px 0;">
-            <div class="stSpinner">Loading your data...</div>
-        </div>
-        <p style="color: #666;">Please wait while we process your project data</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-def auto_load_data():
-    """Automatically load data from data directory on first run"""
-    print("🔍 TERMINAL: auto_load_data() called")
-    if st.session_state.data_loading_attempted:
-        print("🔍 TERMINAL: Data loading already attempted, skipping")
-        return
-    
-    print("🔍 TERMINAL: Starting data loading process...")
-    st.session_state.data_loading_attempted = True
-    
-    # Check what data directory we're using
-    data_dir = get_data_directory()
-    print(f"🔍 TERMINAL: Using data directory: {data_dir}")
-    
-    # Show what files exist in the data directory
-    if os.path.exists(data_dir):
-        all_files = os.listdir(data_dir)
-        print(f"🔍 TERMINAL: Found {len(all_files)} total files in {data_dir}")
-        for f in sorted(all_files):
-            print(f"🔍 TERMINAL:   • {f}")
-            
-        parquet_files = [f for f in all_files if f.endswith(('.parquet', '.pq'))]
-        print(f"🔍 TERMINAL: Parquet files: {parquet_files}")
-    else:
-        print(f"🔍 TERMINAL: Data directory {data_dir} doesn't exist!")
-        return
-    
-    # Look for required main data (time_records)
-    print("🔍 TERMINAL: Looking for main time_records data...")
-    main_parquet_path = find_parquet_file()
-    print(f"🔍 TERMINAL: find_parquet_file() returned: {main_parquet_path}")
-    
-    if not main_parquet_path:
-        # Show clear error - main data is required
-        st.error("📊 No time records data found in data directory")
-        st.info("Please upload a file named like: *time_records*.parquet via Admin panel")
-        print(f"🔍 TERMINAL: No time_records files found in {data_dir} directory")
-        return
-    
-    # Process the main parquet file
-    print(f"🔍 TERMINAL: Loading main data from: {main_parquet_path}")
-    try:
-        process_parquet_data_from_path(main_parquet_path)
-        print("🔍 TERMINAL: Main data loaded successfully!")
-        
-        # Try to load optional planned data
-        planned_parquet_path = find_planned_parquet_file()
-        if planned_parquet_path:
-            print(f"🔍 TERMINAL: Found planned data: {planned_parquet_path}")
-            # TODO: Add planned data loading here when needed
+    if loading_results['loading_method'] == 'auto_volume':
+        # Data was auto-loaded from volume
+        if loading_results['success']:
+            st.success("🎉 **Data loaded successfully from volume!**")
+            display_loading_results(loading_results)
+            return True
         else:
-            print("🔍 TERMINAL: No planned data found (optional)")
-            
-    except Exception as e:
-        st.error(f"❌ Error loading data from parquet file: {str(e)}")
-        print(f"🔍 TERMINAL: Error loading data: {str(e)}")
-        import traceback
-        print(f"🔍 TERMINAL: Full error details: {traceback.format_exc()}")
+            st.error(f"❌ **Auto-loading failed**: {loading_results.get('error', 'Unknown error')}")
 
-def render_currency_setup():
-    """Render error message if currency couldn't be auto-detected"""
-    st.title('Arkemy: Turn Your Project Data Into Gold 🥇')
-    st.markdown("##### v1.3.1 Parquet")
-    
-    st.error("Currency could not be detected from filename.")
-    st.markdown("Please name your file like: `data_NOK.parquet` or `data_USD.parquet`")
-    
-    # Fallback manual selection
-    from utils.currency_formatter import get_currency_selector, get_currency_display_name
-    currency_valid, _ = get_currency_selector("fallback_currency_selector", required=True)
-    
-    if currency_valid:
-        st.success(f"Selected currency: {get_currency_display_name()}")
-        st.session_state.currency_selected = True
-        st.rerun()
+    elif loading_results['loading_method'] == 'upload_required':
+        # No files in volume, show upload interface
+        return render_upload_interface(debug_mode)
 
+    return False
 
-# Analytics Dashboard main logic
-print("🔍 TERMINAL: Analytics Dashboard main logic executing")
-print(f"🔍 TERMINAL: is_data_loaded() = {is_data_loaded()}")
+def render_upload_interface(debug_mode: bool) -> bool:
+    """Render file upload interface."""
+    from utils.unified_data_loader import load_data_from_upload
 
-if not is_data_loaded():
-    print("🔍 TERMINAL: Data not loaded, calling auto_load_data()")
-    # Auto-load data on first run
-    auto_load_data()
-    
-    # Show loading screen if data still not loaded
-    if not is_data_loaded():
-        print("🔍 TERMINAL: Data still not loaded after auto_load_data, showing loading screen")
-        show_loading_screen()
+    st.markdown("### 📤 Upload Data File")
+    st.markdown("Upload a parquet file containing your time tracking data. The system supports unified files with multiple record types.")
+
+    # File uploader
+    uploaded_file = st.file_uploader(
+        "Choose a parquet file",
+        type=['parquet', 'pq'],
+        help="Upload a .parquet file with time tracking and/or planned hours data"
+    )
+
+    if uploaded_file is not None:
+        st.info(f"📁 **File selected**: `{uploaded_file.name}` ({round(len(uploaded_file.getvalue()) / (1024*1024), 2)} MB)")
+
+        if st.button("🚀 Process File", type="primary"):
+            with st.spinner("Processing file..."):
+                loading_results = load_data_from_upload(uploaded_file, debug_mode)
+
+            if loading_results['success']:
+                st.success("🎉 **File processed successfully!**")
+                display_loading_results(loading_results)
+                return True
+            else:
+                st.error(f"❌ **File processing failed**: {loading_results.get('error', 'Unknown error')}")
+
+    return False
+
+def display_loading_results(results: dict):
+    """Display the results of data loading."""
+
+    # Currency and method info
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("Currency Detected", results['currency'].upper())
+
+    with col2:
+        method_display = {
+            'auto_volume': 'Auto-Loaded',
+            'upload': 'Uploaded',
+            'manual': 'Manual'
+        }
+        st.metric("Loading Method", method_display.get(results['loading_method'], 'Unknown'))
+
+    with col3:
+        total_records = sum(len(df) for df in results['processed_data'].values())
+        st.metric("Total Records", f"{total_records:,}")
+
+    # Record type breakdown
+    if results['processed_data']:
+        st.markdown("### 📊 Data Summary")
+
+        for record_type, df in results['processed_data'].items():
+            validation = results['validation_results'].get(record_type, {})
+
+            with st.expander(f"📋 {record_type.replace('_', ' ').title()} ({len(df):,} records)", expanded=True):
+
+                # Validation status
+                if validation.get('is_valid', False):
+                    st.success("✅ Schema validation passed")
+                else:
+                    st.warning("⚠️ Schema validation had issues")
+
+                # Quick stats
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Records", f"{len(df):,}")
+                with col2:
+                    if 'person_name' in df.columns:
+                        st.metric("People", df['person_name'].nunique())
+                with col3:
+                    if 'project_number' in df.columns:
+                        st.metric("Projects", df['project_number'].nunique())
+
+                # Sample data
+                if not df.empty:
+                    st.markdown("**Sample Data:**")
+                    # Show key columns only
+                    key_cols = ['record_date', 'person_name', 'project_number']
+                    if record_type == 'time_record':
+                        key_cols.extend(['hours_used', 'hours_billable'])
+                    elif record_type == 'planned_record':
+                        key_cols.extend(['planned_hours'])
+
+                    available_cols = [col for col in key_cols if col in df.columns]
+                    if available_cols:
+                        st.dataframe(df[available_cols].head(), use_container_width=True)
+
+def render_data_loaded_status():
+    """Show status when data is already loaded."""
+    st.success("✅ **Data is loaded and ready for analysis!**")
+
+    # Quick stats
+    df = st.session_state.transformed_df
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("Total Records", f"{len(df):,}")
+    with col2:
+        st.metric("People", df['person_name'].nunique() if 'person_name' in df.columns else 'N/A')
+    with col3:
+        st.metric("Projects", df['project_number'].nunique() if 'project_number' in df.columns else 'N/A')
+    with col4:
+        st.metric("Currency", st.session_state.currency.upper())
+
+    # Show planned data status if available
+    if st.session_state.get('planned_csv_loaded', False) and st.session_state.transformed_planned_df is not None:
+        planned_df = st.session_state.transformed_planned_df
+        st.info(f"📅 **Planned data also loaded**: {len(planned_df):,} planned records")
+
+    # Option to reload data
+    col1, col2 = st.columns([3, 1])
+    with col2:
+        if st.button("🔄 Reload Data"):
+            # Clear session state to trigger reload
+            st.session_state.csv_loaded = False
+            st.session_state.transformed_df = None
+            st.session_state.planned_csv_loaded = False
+            st.session_state.transformed_planned_df = None
+            st.rerun()
+
+def main():
+    """Main page logic."""
+
+    # Try to load data
+    data_loaded = render_data_loading_interface()
+
+    if data_loaded and st.session_state.csv_loaded:
+        st.markdown("---")
+
+        # Import and render the main dashboard
+        try:
+            from ui.dashboard import render_dashboard
+            render_dashboard()
+        except ImportError as e:
+            st.error(f"Dashboard import error: {e}")
+            st.info("Dashboard functionality not available. Please check your imports.")
     else:
-        print("🔍 TERMINAL: Data loaded successfully after auto_load_data")
-        # Render the dashboard with newly loaded data
-        render_dashboard()
+        # Show helpful information while waiting for data
+        st.markdown("---")
+        st.markdown("### 📖 About This Dashboard")
+
+        st.markdown("""
+        **Arkemy Analytics Dashboard** provides comprehensive project analytics including:
+
+        - 📊 **Summary KPIs**: Revenue, hours, profitability metrics
+        - 📈 **Time Trends**: Monthly and yearly performance tracking
+        - 👥 **People Analytics**: Individual and team performance
+        - 📁 **Project Analysis**: Project-level insights and comparisons
+        - 💰 **Customer Analytics**: Revenue and profitability by client
+        - 🏗️ **Phase Analysis**: Project phase performance tracking
+
+        **New Features:**
+        - ✨ **Schema-Driven Loading**: Easy data validation and processing
+        - 🔄 **Auto-Loading**: Automatically loads data from `/data` volume
+        - 📤 **Upload Fallback**: Manual upload when no volume data available
+        - 🎯 **Record Type Support**: Handles both time records and planned hours
+        - 🌍 **Multi-Currency**: Automatic currency detection from filenames
+        """)
+
+if __name__ == "__main__":
+    main()
 else:
-    print("🔍 TERMINAL: Data already loaded, showing dashboard")
-    # Render the dashboard with data
-    render_dashboard()
+    # When imported as a page, run main function
+    main()

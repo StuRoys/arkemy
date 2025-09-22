@@ -259,10 +259,13 @@ def process_parquet_data_from_path(parquet_path):
             st.error("No main project data found in the Parquet file.")
             return
         
-        # Validate main data schema (silent for clean UI)
+        # Validate main data schema 
         validation_results = validate_csv_schema(main_data)
         print(f"🔍 TERMINAL: Schema validation - Valid: {validation_results['is_valid']}")
-        # display_validation_results(validation_results)  # Commented out for clean UI
+        
+        # Show validation results when debug mode is enabled
+        if is_debug_mode():
+            display_validation_results(validation_results)
         
         # If the data is valid, proceed with transformation and store in session state
         if validation_results["is_valid"]:

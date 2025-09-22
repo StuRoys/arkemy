@@ -1,121 +1,251 @@
-# ARKEMY standard schema for time tracking data
-# This schema defines the standardized output format for all time tracking data
+# ARKEMY Schema Configuration
+# This schema defines record types, fields, and validation rules for time tracking data
+# Edit this file to modify data requirements without changing code
 
-# Core time tracking data
-core_fields:
-  - record_id            # Unique identifier for each time entry
-  - record_type          # Type of record: time_record, planned_record, invoice, invoice_provision, project_metadata, person_metadata, customer_metadata
-  - record_date          # Date in YYYY-MM-DD format
-  - record_desc          # Time entry description/notes
-  - person_id            # System ID of the person  
-  - person_name          # Person who logged the time
-  - person_type          # Internal or External
-  - person_role          # User's role on this project (e.g., "Project Manager")
-  - minutes_used         # Total time logged in minutes
-  - minutes_billable     # Billable time in minutes
-  - minutes_non_billable # Non-billable time in minutes
-  - minutes_invoiced     # Invoiced time in minutes
-  - hours_used           # Total time logged in hours (calculated)
-  - hours_billable       # Billable time in hours (calculated)
-  - hours_non_billable   # Non-billable time in hours (calculated)
-  - hours_invoiced       # Invoiced time in hours (calculated)
-  - billable_rate_record # Billable rate in company currency from time record
-  - billable_rate_adjust # Adjusted billable rate (calculated later)
-  - planned_minutes      # Planned time in minutes
-  - planned_hours        # Planned time in hours
-  - planned_billable     # Planned billable hours
-  - planned_rate         # Planned hourly rate
-  - planned_income       # Total planned income
+schema_version: "2.0"
+description: "Unified schema for time tracking and planned hours data"
 
-# Project and customer context
-project_fields:
-  - project_id         # System ID of the project
-  - project_name       # Name of the project
-  - project_number     # Project identifier/code
-  - customer_id        # System ID of customer  
-  - customer_name      # Client/customer name
-  - customer_number    # Customer identifier/code
-  - activity_name      # Project phase/extension (e.g., "Production", "Design")
-  - price_model_type   # Pricing model (hourly_rate, fixed_price, not_billable)
-  - price_model_name   # Name of price model
+# Core configuration
+settings:
+  record_type_column: "record_type"
+  default_record_type: "time_record"
+  date_column: "record_date"
+  required_id_fields: ["record_id", "person_name", "project_number"]
 
-# Tag fields (extracted from nested structures)
-tag_fields:
-  - project_tag         # Project-related tags (pipe-delimited)
-  - activity_tag        # Activity-related tags (pipe-delimited)
-  - customer_tag        # Customer-related tags (pipe-delimited)
-  - record_tag          # Time record specific tags (pipe-delimited)
-  - phase_tag           # Project phase tags (pipe-delimited)
-  - person_tag          # Person-related tags (pipe-delimited)
-  - custom_tag_1        # Flexible tag field 1
-  - custom_tag_2        # Flexible tag field 2
-  - custom_tag_3        # Flexible tag field 3
-  - custom_tag_4        # Flexible tag field 4
-  - custom_tag_5        # Flexible tag field 5  
-  - custom_tag_6        # Flexible tag field 6  
-  - custom_tag_7        # Flexible tag field 7  
-  - custom_tag_8        # Flexible tag field 8  
-  - custom_tag_9        # Flexible tag field 9 
-  - custom_tag_10       # Flexible tag field 10 
+# Define record types and their specific requirements
+record_types:
+  time_record:
+    description: "Actual time tracking entries"
+    display_name: "Time Records"
+    required_fields:
+      - record_date
+      - person_name
+      - project_number
+      - hours_used
+    optional_fields:
+      - record_desc
+      - person_type
+      - person_role
+      - hours_billable
+      - hours_non_billable
+      - billable_rate_record
+      - billable_rate_adjust
+      - project_name
+      - customer_name
+      - cost_hour
+      - cost_record
+      - fee_record
+      - profit_hour
+      - profit_record
+    session_state_target: "transformed_df"
 
-# System metadata
-metadata_fields:
-  - company_name       # Name of the company
-  - company_code       # Company identifier
-  - extraction_date    # Date when data was extracted
-  - source_system      # Source time tracking system
+  planned_record:
+    description: "Planned/forecast hours entries"
+    display_name: "Planned Hours"
+    required_fields:
+      - record_date
+      - person_name
+      - project_number
+    optional_fields:
+      - project_name
+      - customer_name
+      - planned_hours
+      - planned_rate
+      - planned_income
+    session_state_target: "transformed_planned_df"
 
-# Data types and constraints
-field_types:
-  record_id: string
-  record_type: string
-  record_date: date
-  record_desc: string
-  person_id: string
-  person_name: string
-  person_type: string
-  person_role: string
-  minutes_used: integer
-  minutes_billable: integer
-  minutes_non_billable: integer
-  minutes_invoiced: integer
-  hours_used: float
-  hours_billable: float
-  hours_non_billable: float
-  hours_invoiced: float
-  billable_rate_record: float
-  billable_rate_adjust: float
-  planned_minutes: integer
-  planned_hours: float
-  planned_billable: float
-  planned_rate: float
-  planned_income: float
-  project_id: string
-  project_name: string
-  project_number: string
-  customer_id: string
-  customer_name: string
-  customer_number: string
-  activity_name: string
-  price_model_type: string
-  price_model_name: string
-  project_tag: string
-  activity_tag: string
-  customer_tag: string
-  record_tag: string
-  phase_tag: string
-  person_tag: string
-  custom_tag_1: string
-  custom_tag_2: string
-  custom_tag_3: string
-  custom_tag_4: string
-  custom_tag_5: string
-  custom_tag_6: string
-  custom_tag_7: string
-  custom_tag_8: string
-  custom_tag_9: string
-  custom_tag_10: string
-  company_name: string
-  company_code: string
-  extraction_date: date
-  source_system: string
+# Field definitions with types and validation rules
+fields:
+  # Core identifiers
+  record_id:
+    type: string
+    description: "Unique identifier for each record"
+
+  record_type:
+    type: string
+    description: "Type of record (time_record, planned_record, etc.)"
+    required: true
+
+  record_date:
+    type: datetime
+    description: "Date in YYYY-MM-DD format"
+    required: true
+
+  record_desc:
+    type: string
+    description: "Description or notes for the entry"
+
+  # Person information
+  person_id:
+    type: string
+    description: "System ID of the person"
+
+  person_name:
+    type: string
+    description: "Name of the person who logged time"
+    required: true
+
+  person_type:
+    type: string
+    description: "Internal or External"
+
+  person_role:
+    type: string
+    description: "Person's role on the project"
+
+  # Time tracking fields
+  hours_used:
+    type: float
+    description: "Total time logged in hours"
+    min_value: 0
+
+  hours_billable:
+    type: float
+    description: "Billable hours"
+    min_value: 0
+
+  hours_non_billable:
+    type: float
+    description: "Non-billable hours"
+    min_value: 0
+
+  # Financial fields
+  billable_rate_record:
+    type: float
+    description: "Billable rate from time record"
+    min_value: 0
+
+  billable_rate_adjust:
+    type: float
+    description: "Adjusted billable rate"
+    min_value: 0
+
+  cost_hour:
+    type: float
+    description: "Cost per hour"
+    min_value: 0
+
+  cost_record:
+    type: float
+    description: "Total cost for the record"
+
+  fee_record:
+    type: float
+    description: "Total fee for the record"
+
+  profit_hour:
+    type: float
+    description: "Profit per hour"
+
+  profit_record:
+    type: float
+    description: "Total profit for the record"
+
+  # Planned fields
+  planned_hours:
+    type: float
+    description: "Planned time in hours"
+    min_value: 0
+
+  planned_rate:
+    type: float
+    description: "Planned hourly rate"
+    min_value: 0
+
+  planned_income:
+    type: float
+    description: "Total planned income"
+    min_value: 0
+
+  # Project information
+  project_id:
+    type: string
+    description: "System ID of the project"
+
+  project_number:
+    type: string
+    description: "Project identifier/code"
+    required: true
+
+  project_name:
+    type: string
+    description: "Name of the project"
+
+  # Customer information
+  customer_id:
+    type: string
+    description: "System ID of customer"
+
+  customer_number:
+    type: string
+    description: "Customer identifier/code"
+
+  customer_name:
+    type: string
+    description: "Client/customer name"
+
+  # Project context
+  activity_name:
+    type: string
+    description: "Project phase/activity"
+
+  price_model_type:
+    type: string
+    description: "Pricing model type"
+
+  price_model_name:
+    type: string
+    description: "Name of pricing model"
+
+  # Tag fields
+  phase_tag:
+    type: string
+    description: "Project phase tags"
+
+  person_tag:
+    type: string
+    description: "Person-related tags"
+
+  project_tags:
+    type: string
+    description: "Project-related tags"
+
+  customer_tags:
+    type: string
+    description: "Customer-related tags"
+
+  timeRecord_tags:
+    type: string
+    description: "Time record specific tags"
+
+  # System metadata
+  company_name:
+    type: string
+    description: "Name of the company"
+
+  company_code:
+    type: string
+    description: "Company identifier"
+
+  extraction_date:
+    type: datetime
+    description: "Date when data was extracted"
+
+  source_system:
+    type: string
+    description: "Source time tracking system"
+
+# Type mapping for pandas
+pandas_type_mapping:
+  string: "string"
+  integer: "Int64"
+  float: "float64"
+  datetime: "datetime64[ns]"
+  boolean: "boolean"
+
+# Validation settings
+validation:
+  strict_mode: false
+  allow_unknown_fields: true
+  show_field_descriptions: true
+  max_validation_errors: 10
