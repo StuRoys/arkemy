@@ -97,9 +97,9 @@ def create_customer_filter(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, An
     if 'customer_number' not in df.columns or 'customer_name' not in df.columns:
         return df, filter_settings
     
-    customers = df[['customer_number', 'customer_name']].drop_duplicates()
+    customers = df[['customer_number', 'customer_name']].dropna().drop_duplicates()
     customers['Customer'] = customers['customer_name'] + ' (' + customers['customer_number'] + ')'
-    customer_options = customers['Customer'].tolist()
+    customer_options = sorted(customers['Customer'].tolist())
     
     # Use current state for indicator
     current_included = st.session_state.get('customer_included', [])
@@ -126,11 +126,11 @@ def create_customer_filter(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, An
     filtered_df = df.copy()
     
     if selected_customers:
-        included_ids = [c.split('(')[-1].split(')')[0] for c in selected_customers]
+        included_ids = [c.split('(')[-1].split(')')[0] for c in selected_customers if c and '(' in c and ')' in c]
         filtered_df = filtered_df[filtered_df['customer_number'].isin(included_ids)]
     
     if exclude_customers:
-        excluded_ids = [c.split('(')[-1].split(')')[0] for c in exclude_customers]
+        excluded_ids = [c.split('(')[-1].split(')')[0] for c in exclude_customers if c and '(' in c and ')' in c]
         filtered_df = filtered_df[~filtered_df['customer_number'].isin(excluded_ids)]
     
     filter_settings['include_all_customers'] = len(selected_customers) == 0
@@ -150,9 +150,9 @@ def create_project_filter(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any
     if not has_project_data:
         return df, filter_settings
     
-    projects = df[['project_number', 'project_name']].drop_duplicates()
+    projects = df[['project_number', 'project_name']].dropna().drop_duplicates()
     projects['Project label'] = projects['project_name'] + ' (' + projects['project_number'] + ')'
-    project_options = projects['Project label'].tolist()
+    project_options = sorted(projects['Project label'].tolist())
     
     current_included = st.session_state.get('project_included', [])
     current_excluded = st.session_state.get('project_excluded', [])
@@ -178,11 +178,11 @@ def create_project_filter(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any
     filtered_df = df.copy()
     
     if selected_projects:
-        included_ids = [p.split('(')[-1].split(')')[0] for p in selected_projects]
+        included_ids = [p.split('(')[-1].split(')')[0] for p in selected_projects if p and '(' in p and ')' in p]
         filtered_df = filtered_df[filtered_df['project_number'].isin(included_ids)]
     
     if exclude_projects:
-        excluded_ids = [p.split('(')[-1].split(')')[0] for p in exclude_projects]
+        excluded_ids = [p.split('(')[-1].split(')')[0] for p in exclude_projects if p and '(' in p and ')' in p]
         filtered_df = filtered_df[~filtered_df['project_number'].isin(excluded_ids)]
     
     filter_settings['include_all_projects'] = len(selected_projects) == 0
@@ -200,7 +200,7 @@ def create_project_type_filter(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str
     if 'project_tag' not in df.columns:
         return df, filter_settings
     
-    project_types = sorted(df['project_tag'].unique().tolist())
+    project_types = sorted(df['project_tag'].dropna().unique().tolist())
     
     current_included = st.session_state.get('project_type_included', [])
     current_excluded = st.session_state.get('project_type_excluded', [])
@@ -247,7 +247,7 @@ def create_price_model_filter(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str,
     if 'Price model' not in df.columns:
         return df, filter_settings
     
-    price_models = sorted(df['Price model'].unique().tolist())
+    price_models = sorted(df['Price model'].dropna().unique().tolist())
     
     current_included = st.session_state.get('price_model_included', [])
     current_excluded = st.session_state.get('price_model_excluded', [])
@@ -301,7 +301,7 @@ def create_activity_filter(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, An
     activity_active = False
     
     if has_phase:
-        phases = sorted(df['phase_tag'].unique().tolist())
+        phases = sorted(df['phase_tag'].dropna().unique().tolist())
         current_included = st.session_state.get('phase_included', [])
         current_excluded = st.session_state.get('phase_excluded', [])
         indicator = " 🔴" if (current_included or current_excluded) else ""
@@ -335,7 +335,7 @@ def create_activity_filter(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, An
         phase_active = len(selected_phases) > 0 or len(exclude_phases) > 0
     
     if has_activity:
-        activities = sorted(filtered_df['activity_tag'].unique().tolist())
+        activities = sorted(filtered_df['activity_tag'].dropna().unique().tolist())
         current_included = st.session_state.get('activity_included', [])
         current_excluded = st.session_state.get('activity_excluded', [])
         indicator = " 🔴" if (current_included or current_excluded) else ""
@@ -381,7 +381,7 @@ def create_person_filter(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]
     if 'person_name' not in df.columns:
         return df, filter_settings
     
-    persons = sorted(df['person_name'].unique().tolist())
+    persons = sorted(df['person_name'].dropna().unique().tolist())
     
     current_included = st.session_state.get('person_included', [])
     current_excluded = st.session_state.get('person_excluded', [])
@@ -441,10 +441,14 @@ def create_person_type_filter(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str,
         )
     
     if selected_include == "Internal":
-        filtered_df = df[df['person_type'].fillna('').str.lower() == 'internal']
+        # Use more robust boolean filtering to avoid NA ambiguity
+        mask = df['person_type'].notna() & (df['person_type'].str.lower() == 'internal')
+        filtered_df = df[mask]
         filter_settings['selected_person_type'] = 'internal'
     elif selected_include == "External":
-        filtered_df = df[df['person_type'].fillna('').str.lower() == 'external']
+        # Use more robust boolean filtering to avoid NA ambiguity
+        mask = df['person_type'].notna() & (df['person_type'].str.lower() == 'external')
+        filtered_df = df[mask]
         filter_settings['selected_person_type'] = 'external'
     else:
         filtered_df = df

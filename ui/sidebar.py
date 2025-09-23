@@ -173,9 +173,11 @@ def apply_filters_to_planned_data(planned_df, filter_settings, filtered_actual_d
         
         if person_type_col:
             if filter_settings['selected_person_type'] == 'internal':
-                filtered_df = filtered_df[filtered_df[person_type_col].fillna('').str.lower() == 'internal']
+                mask = filtered_df[person_type_col].notna() & (filtered_df[person_type_col].str.lower() == 'internal')
+                filtered_df = filtered_df[mask]
             elif filter_settings['selected_person_type'] == 'external':
-                filtered_df = filtered_df[filtered_df[person_type_col].fillna('').str.lower() == 'external']
+                mask = filtered_df[person_type_col].notna() & (filtered_df[person_type_col].str.lower() == 'external')
+                filtered_df = filtered_df[mask]
     
     # 7. Project type filters (included project types)
     if 'included_project_types' in filter_settings and filter_settings['included_project_types']:
