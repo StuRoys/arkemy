@@ -77,6 +77,12 @@ Before ANY Railway deployment:
 
 **REMEMBER**: User wants to test first, commit second, deploy third - all with explicit approval
 
+## Communication Style
+- **Chat summaries should be sober, concise and factual**
+- **User does not need flair, emojis, or success messages**
+- **Avoid phrases like "Perfect!", "Great!", "🚀" or similar excitement**
+- **Focus on technical facts and what was accomplished**
+
 ## Common Development Commands
 
 **Run the application:**
