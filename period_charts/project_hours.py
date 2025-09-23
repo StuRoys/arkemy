@@ -69,7 +69,7 @@ def render_single_project_hours(df, project_name):
     # Create color map and hover template
     color_map = create_color_map(value_cols, scheme="blue")
     translated_color_map = {translations_map.get(k, k): v for k, v in color_map.items() if k in value_cols}
-    hover_template = create_hover_template(include_units=True, unit_text=t('hrs'), decimal_places=1)
+    hover_template = create_hover_template(include_units=True, unit_text=t('hrs'), decimal_places=0)
     
     # Create and display the chart
     fig = create_bar_chart(
@@ -188,7 +188,7 @@ def render_all_projects_hours(df):
         melted_df["custom_label"] = melted_df["Metric Type Translated"]
         
         # Create hover template
-        hover_template = create_hover_template(include_units=True, unit_text=t('hrs'), decimal_places=1)
+        hover_template = create_hover_template(include_units=True, unit_text=t('hrs'), decimal_places=0)
         
         # Create and display the bar chart
         fig = create_bar_chart(

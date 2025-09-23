@@ -192,7 +192,6 @@ def try_autoload_project_data():
             # Try to transform parquet to project report format
             transformed_df = transform_parquet_to_project_report(parquet_path)
             if transformed_df is not None and not transformed_df.empty:
-                st.success(f"Loaded project data from {os.path.basename(parquet_path)} (transformed from unified schema)")
                 return transformed_df
         except Exception as e:
             st.warning(f"Could not transform {os.path.basename(parquet_path)}: {str(e)}")
@@ -209,7 +208,6 @@ def try_autoload_project_data():
             filepath = files[0]
             try:
                 df = pd.read_csv(filepath)
-                st.info(f"Loaded project data from {os.path.basename(filepath)} (CSV format)")
                 return df
             except Exception as e:
                 st.warning(f"Could not load {os.path.basename(filepath)}: {str(e)}")
@@ -223,7 +221,6 @@ def try_autoload_project_data():
             # Check if it has typical project columns
             project_columns = ['Project ID', 'Project Name', 'Period Hours', 'Period Fees Adjusted']
             if any(col in df.columns for col in project_columns):
-                st.info(f"Loaded project data from {os.path.basename(filepath)} (detected CSV format)")
                 return df
         except Exception as e:
             continue

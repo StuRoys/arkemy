@@ -51,18 +51,18 @@ def create_color_map(metric_types, scheme="blue"):
     
     selected_scheme = color_schemes.get(scheme, color_schemes["blue"])
     
-    # Assign colors based on position in list
+    # Assign colors based on position in list (inverse so "used" gets darker primary color)
     if len(metric_types) >= 2:
         return {
-            metric_types[0]: selected_scheme["secondary"],
-            metric_types[1]: selected_scheme["primary"]
+            metric_types[0]: selected_scheme["secondary"],  # Planned data gets light color
+            metric_types[1]: selected_scheme["primary"]     # Used data gets dark color
         }
     elif len(metric_types) == 1:
         return {metric_types[0]: selected_scheme["primary"]}
     else:
         return {}
 
-def create_hover_template(include_units=False, unit_text="", decimal_places=1):
+def create_hover_template(include_units=False, unit_text="", decimal_places=0):
     """Create a custom hover template for charts."""
     format_str = f":.{decimal_places}f"
     
