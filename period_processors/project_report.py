@@ -372,15 +372,28 @@ def render_project_period_filters(df):
         filter_params['month'] = selected_month_num
     
     elif period_filter == t('quarters'):
+        from datetime import datetime
+
         # Get list of years in the data
         years = sorted(df["Period"].dt.year.unique(), reverse=True)
-        
+        current_year = datetime.now().year
+
+        # Default to current year if available, otherwise most recent year
+        year_default_index = 0
+        if current_year in years:
+            year_default_index = years.index(current_year)
+
         # Create two columns for year and quarter selection
         year_col, quarter_col = st.sidebar.columns(2)
-        
+
         # Year selection
         with year_col:
-            selected_year = st.selectbox(t('select_year'), years, key='quarter_year')
+            selected_year = st.selectbox(
+                t('select_year'),
+                years,
+                index=year_default_index,
+                key='quarter_year'
+            )
         
         # Quarter selection
         with quarter_col:
