@@ -24,7 +24,6 @@ def render_data_management_section():
 
 def render_current_data_status():
     """Show current data loading status with detailed file information."""
-    st.markdown("### 📈 Current Data Status")
 
     if st.session_state.get('csv_loaded', False) and st.session_state.transformed_df is not None:
         df = st.session_state.transformed_df
@@ -189,7 +188,6 @@ def render_client_access():
 
 def render_data_operations():
     """Render data operation buttons."""
-    st.markdown("### 🔄 Data Operations")
 
     col1, col2, col3 = st.columns(3)
 
@@ -214,7 +212,6 @@ def render_data_operations():
 
 def render_file_management():
     """Render file management interface."""
-    st.markdown("### 📁 File Management")
 
     # Volume statistics (moved from legacy)
     render_volume_stats_inline()
@@ -337,21 +334,50 @@ def render_admin_file_uploader():
                 st.error(f"❌ **File processing failed**: {loading_results.get('error', 'Unknown error')}")
 
 def render_file_browser():
-    """Render file browser for both local and volume directories."""
-    st.markdown("#### 📂 Available Files")
-
+    """Render file browser with clean expander sections."""
     # Check both directories
-    local_files = get_files_from_directory("./data", "Local Directory (./data)")
-    volume_files = get_files_from_directory("/data", "Production Volume (/data)")
+    local_files = get_files_from_directory("./data", "Local Directory")
+    volume_files = get_files_from_directory("/data", "Production Volume")
 
+    # Local Data expander
     if local_files:
-        render_file_list(local_files, "Local Directory (./data)")
+        with st.expander(f"Local Data (./data) - {len(local_files)} files", expanded=False):
+            for file_info in local_files:
+                col1, col2, col3 = st.columns([3, 1, 1])
+                with col1:
+                    icon = "📊" if file_info['is_parquet'] else "📄"
+                    st.write(f"{icon} {file_info['filename']}")
+                with col2:
+                    st.write(f"{file_info['size_mb']} MB")
+                with col3:
+                    file_type = "Parquet" if file_info['is_parquet'] else "Other"
+                    st.write(file_type)
+    else:
+        with st.expander("Local Data (./data) - No files", expanded=False):
+            st.info("No files found in local directory")
 
+    # Production Volume expander
     if volume_files:
-        render_file_list(volume_files, "Production Volume (/data)")
+        with st.expander(f"Production Volume (/data) - {len(volume_files)} files", expanded=False):
+            for file_info in volume_files:
+                col1, col2, col3 = st.columns([3, 1, 1])
+                with col1:
+                    icon = "📊" if file_info['is_parquet'] else "📄"
+                    st.write(f"{icon} {file_info['filename']}")
+                with col2:
+                    st.write(f"{file_info['size_mb']} MB")
+                with col3:
+                    file_type = "Parquet" if file_info['is_parquet'] else "Other"
+                    st.write(file_type)
 
-    if not local_files and not volume_files:
-        st.info("📂 No data files found in either local directory or production volume.")
+            # Upload functionality for Railway persistent storage
+            st.markdown("---")
+            render_file_uploader()
+    else:
+        with st.expander("Production Volume (/data) - No files", expanded=False):
+            st.info("No files found in production volume")
+            # Upload functionality for Railway persistent storage
+            render_file_uploader()
 
 def get_files_from_directory(directory_path: str, display_name: str):
     """Get files from a specific directory."""
@@ -380,7 +406,6 @@ def get_files_from_directory(directory_path: str, display_name: str):
 
 def render_file_list(files, directory_name):
     """Render a list of files."""
-    st.markdown(f"##### {directory_name}")
 
     for i, file_info in enumerate(files):
         with st.expander(f"{'📊' if file_info['is_parquet'] else '📄'} {file_info['filename']}", expanded=False):
@@ -424,67 +449,10 @@ def get_volume_files():
     
     return files_info
 
-def render_file_browser():
-    """Render file browser interface"""
-    st.markdown("### 📁 File Browser")
-    
-    files = get_volume_files()
-    
-    if not files:
-        st.info("📂 Volume is empty")
-        return
-    
-    st.success(f"Found {len(files)} file(s) in volume:")
-    
-    # Create table header
-    cols = st.columns([3, 1, 2, 2, 1])
-    cols[0].markdown("**Filename**")
-    cols[1].markdown("**Type**")
-    cols[2].markdown("**Size**")
-    cols[3].markdown("**Modified**")
-    cols[4].markdown("**Action**")
-    
-    st.markdown("---")
-    
-    # List each file
-    for i, file_info in enumerate(files):
-        cols = st.columns([3, 1, 2, 2, 1])
-        
-        # Filename with icon
-        icon = "📊" if file_info['is_parquet'] else "📄"
-        cols[0].write(f"{icon} {file_info['filename']}")
-        
-        # File type
-        file_type = "Parquet" if file_info['is_parquet'] else "Other"
-        cols[1].write(file_type)
-        
-        # Size
-        if file_info['size_mb'] > 0:
-            cols[2].write(f"{file_info['size_mb']} MB")
-        else:
-            cols[2].write(f"{file_info['size']:,} bytes")
-        
-        # Modified date
-        cols[3].write(file_info['modified'].strftime('%Y-%m-%d %H:%M'))
-        
-        # Delete button
-        if cols[4].button("🗑️", key=f"delete_{i}", help="Delete file"):
-            if st.session_state.get(f"confirm_delete_{i}", False):
-                # Actually delete
-                try:
-                    os.remove(file_info['path'])
-                    st.success(f"Deleted {file_info['filename']}")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error deleting file: {str(e)}")
-            else:
-                # Show confirmation
-                st.session_state[f"confirm_delete_{i}"] = True
-                st.warning(f"Click delete again to confirm removal of {file_info['filename']}")
+# Duplicate render_file_browser function removed - using consolidated version above
 
 def render_file_uploader():
-    """Render file upload interface"""
-    st.markdown("### 📤 Upload Files")
+    """Render file upload interface for Railway persistent storage"""
     
     uploaded_files = st.file_uploader(
         "Choose files to upload to volume", 
@@ -529,56 +497,13 @@ def render_file_uploader():
                 st.success(f"Successfully uploaded {success_count} file(s)")
                 st.rerun()
 
-def render_volume_stats():
-    """Render volume statistics"""
-    volume_path = "/data"
-    
-    if not os.path.exists(volume_path):
-        st.error("❌ Volume not available")
-        return
-    
-    try:
-        files = get_volume_files()
-        total_size = sum(f['size'] for f in files)
-        parquet_files = [f for f in files if f['is_parquet']]
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        col1.metric("Total Files", len(files))
-        col2.metric("Parquet Files", len(parquet_files))
-        col3.metric("Total Size", f"{round(total_size / (1024*1024), 1)} MB")
-        
-        if files:
-            newest = max(files, key=lambda x: x['modified'])
-            col4.metric("Newest File", newest['modified'].strftime('%m-%d %H:%M'))
-        
-    except Exception as e:
-        st.error(f"Error getting volume stats: {str(e)}")
-
-def render_client_link():
-    """Show the client link"""
-    st.markdown("### 🔗 Client Access")
-    
-    # Get the current URL and create client link
-    try:
-        current_url = st.get_option("browser.serverAddress")
-        if current_url and "admin" in current_url.lower():
-            client_url = current_url.replace("/Admin", "").replace("/admin", "")
-        else:
-            client_url = "https://your-app.railway.app"
-    except:
-        client_url = "https://your-app.railway.app"
-    
-    st.code(client_url, language=None)
-    st.markdown("👆 Share this URL with your client for dashboard access")
+# Duplicate render_volume_stats and render_client_link functions removed
 
 def render_debug_interface():
     """Render debug information interface"""
-    st.markdown("### 🐛 Debug Information")
     st.markdown("System and data loading debug information for troubleshooting.")
-    
+
     # Debug Mode Toggle
-    st.markdown("#### 🔧 Debug Mode Control")
     
     # Check current debug mode status
     current_debug = st.session_state.get('debug_mode', False)
@@ -690,6 +615,19 @@ def render_debug_interface():
         st.write(f"{icon} {key}: {value}")
 
 
+def render_client_access():
+    """Render client access information."""
+    st.markdown("Share this URL with clients for dashboard access:")
+
+    # Try to get current URL, fallback to placeholder
+    try:
+        # This will work in most deployments
+        client_url = "https://your-app-url.com"  # Replace with actual deployment URL
+        st.code(client_url, language=None)
+        st.info("💡 **Tip**: Remove '/Admin' from the browser URL to get the client dashboard link")
+    except Exception:
+        st.info("💡 **Client URL**: Remove '/Admin' from the current browser URL")
+
 # Main admin page logic
 st.subheader("🛠️ Admin")
 
@@ -712,4 +650,3 @@ if require_admin_access():
     with col2:
         with st.expander("🔧 **Debug Tools**", expanded=False):
             render_debug_interface()
-
