@@ -95,7 +95,7 @@ def render_single_project_fees(df, project_name):
     forecast_fees = calculate_metric_forecast(filtered_df, "Period Fees Adjusted", "Planned Income")
     
     # Display summary metrics
-    st.markdown(f"### {t('summary')}")
+    # Summary section (no title needed)
     display_metrics_summary(
         filtered_df, 
         value_cols, 
@@ -267,7 +267,7 @@ def render_all_projects_fees(df):
             total_fees_all_projects = sum(project_total_fees.values())
     
     # Display summary metrics
-    st.markdown(f"### {t('summary')}")
+    # Summary section (no title needed)
     display_metrics_summary(
         agg_df, 
         value_cols, 

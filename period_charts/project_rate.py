@@ -101,7 +101,7 @@ def render_single_project_rate(df, project_name):
     forecast_rate = forecast_fees / (forecast_hours + 1) if forecast_hours > 0 else 0
     
     # Display summary metrics
-    st.markdown(f"### {t('summary')}")
+    # Summary section (no title needed)
     
     # Calculate weighted average rates
     total_planned_fees = filtered_df["Planned Income"].sum()
@@ -333,7 +333,7 @@ def render_all_projects_rate(df):
     all_projects_forecast_rate = all_projects_forecast_fees / (all_projects_forecast_hours + 1) if all_projects_forecast_hours > 0 else 0
     
     # Display summary metrics
-    st.markdown(f"### {t('summary')}")
+    # Summary section (no title needed)
     
     # Calculate weighted average rates
     total_planned_fees = viz_df["Planned Income"].sum()

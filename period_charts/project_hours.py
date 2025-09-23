@@ -88,7 +88,7 @@ def render_single_project_hours(df, project_name):
     forecast_hours = calculate_metric_forecast(filtered_df, "Period Hours", "Planned Hours")
     
     # Display summary metrics
-    st.markdown(f"### {t('summary')}")
+    # Summary section (no title needed)
     display_metrics_summary(
         filtered_df, 
         value_cols, 
@@ -254,7 +254,7 @@ def render_all_projects_hours(df):
             total_hours_all_projects = sum(project_total_hours.values())
     
     # Display summary metrics
-    st.markdown(f"### {t('summary')}")
+    # Summary section (no title needed)
     display_metrics_summary(
         agg_df, 
         value_cols, 

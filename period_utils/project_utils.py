@@ -88,8 +88,7 @@ def display_summary_metrics(df, value_cols, translations_map, format_suffix="", 
     if df.empty:
         return
     
-    # Create summary
-    st.markdown(f"### {t('summary')}")
+    # Create summary (no title needed - metrics are self-explanatory)
     
     # Create columns for metrics
     columns = st.columns(len(value_cols))

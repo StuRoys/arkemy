@@ -23,7 +23,7 @@ if 'period_report_project_data' not in st.session_state:
 st.session_state.project_data = st.session_state.period_report_project_data
 
 # Main content
-# Header removed for cleaner UI - page title is already visible in navigation
+st.subheader(t("title_project_report"))
 
 # Handle project upload and rendering (sidebar will be populated by the processor)
 handle_project_upload()
