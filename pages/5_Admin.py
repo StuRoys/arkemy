@@ -14,11 +14,6 @@ def render_data_management_section():
 
     st.markdown("---")
 
-    # Data operations
-    render_data_operations()
-
-    st.markdown("---")
-
     # File management
     render_file_management()
 
@@ -26,22 +21,7 @@ def render_current_data_status():
     """Show current data loading status with detailed file information."""
 
     if st.session_state.get('csv_loaded', False) and st.session_state.transformed_df is not None:
-        df = st.session_state.transformed_df
 
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("📊 Total Records", f"{len(df):,}")
-        with col2:
-            st.metric("👥 People", df['person_name'].nunique() if 'person_name' in df.columns else 'N/A')
-        with col3:
-            st.metric("📁 Projects", df['project_number'].nunique() if 'project_number' in df.columns else 'N/A')
-        with col4:
-            st.metric("💱 Currency", st.session_state.currency.upper())
-
-        # Planned data status
-        if st.session_state.get('planned_csv_loaded', False) and st.session_state.transformed_planned_df is not None:
-            planned_df = st.session_state.transformed_planned_df
-            st.success(f"📅 **Planned data loaded**: {len(planned_df):,} planned records")
 
         # Detailed file information
         render_detailed_file_info()
@@ -186,35 +166,9 @@ def render_client_access():
     except Exception:
         st.info("💡 **Client URL**: Remove '/Admin' from the current browser URL")
 
-def render_data_operations():
-    """Render data operation buttons."""
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        if st.button("🔄 **Reload Data**", key="admin_reload_main", use_container_width=True):
-            # Clear session state to trigger reload
-            st.session_state.csv_loaded = False
-            st.session_state.transformed_df = None
-            st.session_state.planned_csv_loaded = False
-            st.session_state.transformed_planned_df = None
-            st.success("Data state cleared. Navigate to Analytics Dashboard to reload.")
-
-    with col2:
-        debug_mode = st.session_state.get('debug_mode', False)
-        if st.button(f"🐛 **Debug: {'ON' if debug_mode else 'OFF'}**", key="toggle_debug", use_container_width=True):
-            st.session_state.debug_mode = not debug_mode
-            st.success(f"Debug mode {'enabled' if not debug_mode else 'disabled'}")
-
-    with col3:
-        if st.button("📤 **Upload New File**", key="show_uploader", use_container_width=True):
-            st.session_state.show_admin_uploader = True
 
 def render_file_management():
     """Render file management interface."""
-
-    # Volume statistics (moved from legacy)
-    render_volume_stats_inline()
 
     # Show upload interface if requested
     if st.session_state.get('show_admin_uploader', False):
@@ -229,32 +183,6 @@ def render_file_management():
     # File browser
     render_file_browser()
 
-def render_volume_stats_inline():
-    """Render volume statistics inline."""
-    volume_path = "/data"
-    local_path = "./data"
-
-    # Check both paths
-    paths_to_check = [
-        ("/data", "Production Volume"),
-        ("./data", "Local Directory")
-    ]
-
-    for path, label in paths_to_check:
-        if os.path.exists(path):
-            try:
-                files = get_files_from_directory(path, label)
-                if files:
-                    total_size = sum(f['size'] for f in files)
-                    parquet_files = [f for f in files if f['is_parquet']]
-
-                    with st.expander(f"📊 {label} Stats", expanded=False):
-                        col1, col2, col3 = st.columns(3)
-                        col1.metric("Total Files", len(files))
-                        col2.metric("Parquet Files", len(parquet_files))
-                        col3.metric("Total Size", f"{round(total_size / (1024*1024), 1)} MB")
-            except Exception:
-                pass
 
 def display_admin_loading_results(results: dict):
     """Display loading results for admin interface."""
@@ -333,6 +261,29 @@ def render_admin_file_uploader():
             else:
                 st.error(f"❌ **File processing failed**: {loading_results.get('error', 'Unknown error')}")
 
+def delete_file_with_confirmation(file_info, key_suffix):
+    """Delete a file with confirmation pattern."""
+    confirm_key = f"confirm_delete_{key_suffix}"
+
+    if st.session_state.get(confirm_key, False):
+        # Actually delete
+        try:
+            os.remove(file_info['path'])
+            st.success(f"Deleted {file_info['filename']}")
+            # Clear confirmation state
+            if confirm_key in st.session_state:
+                del st.session_state[confirm_key]
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error deleting file: {str(e)}")
+            # Clear confirmation state on error
+            if confirm_key in st.session_state:
+                del st.session_state[confirm_key]
+    else:
+        # Show confirmation
+        st.session_state[confirm_key] = True
+        st.warning(f"Click delete again to confirm removal of {file_info['filename']}")
+
 def render_file_browser():
     """Render file browser with clean expander sections."""
     # Check both directories
@@ -342,16 +293,19 @@ def render_file_browser():
     # Local Data expander
     if local_files:
         with st.expander(f"Local Data (./data) - {len(local_files)} files", expanded=False):
-            for file_info in local_files:
-                col1, col2, col3 = st.columns([3, 1, 1])
+            for i, file_info in enumerate(local_files):
+                col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
                 with col1:
                     icon = "📊" if file_info['is_parquet'] else "📄"
                     st.write(f"{icon} {file_info['filename']}")
                 with col2:
-                    st.write(f"{file_info['size_mb']} MB")
-                with col3:
                     file_type = "Parquet" if file_info['is_parquet'] else "Other"
                     st.write(file_type)
+                with col3:
+                    st.write(f"{file_info['size_mb']} MB")
+                with col4:
+                    if st.button("🗑️", key=f"delete_local_{i}", help="Delete file"):
+                        delete_file_with_confirmation(file_info, f"local_{i}")
     else:
         with st.expander("Local Data (./data) - No files", expanded=False):
             st.info("No files found in local directory")
@@ -359,16 +313,19 @@ def render_file_browser():
     # Production Volume expander
     if volume_files:
         with st.expander(f"Production Volume (/data) - {len(volume_files)} files", expanded=False):
-            for file_info in volume_files:
-                col1, col2, col3 = st.columns([3, 1, 1])
+            for i, file_info in enumerate(volume_files):
+                col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
                 with col1:
                     icon = "📊" if file_info['is_parquet'] else "📄"
                     st.write(f"{icon} {file_info['filename']}")
                 with col2:
-                    st.write(f"{file_info['size_mb']} MB")
-                with col3:
                     file_type = "Parquet" if file_info['is_parquet'] else "Other"
                     st.write(file_type)
+                with col3:
+                    st.write(f"{file_info['size_mb']} MB")
+                with col4:
+                    if st.button("🗑️", key=f"delete_volume_{i}", help="Delete file"):
+                        delete_file_with_confirmation(file_info, f"volume_{i}")
 
             # Upload functionality for Railway persistent storage
             st.markdown("---")
@@ -632,21 +589,11 @@ def render_client_access():
 st.subheader("🛠️ Admin")
 
 if require_admin_access():
-    # Show logout button
-    render_admin_logout()
-
     # Show data management section
     render_data_management_section()
 
     st.markdown("---")
 
-    # Client access and debug tools in expandable sections
-    col1, col2 = st.columns(2)
-
-    with col1:
-        with st.expander("🔗 **Client Access**", expanded=False):
-            render_client_access()
-
-    with col2:
-        with st.expander("🔧 **Debug Tools**", expanded=False):
-            render_debug_interface()
+    # Debug tools in expandable section
+    with st.expander("🔧 **Debug Tools**", expanded=False):
+        render_debug_interface()
