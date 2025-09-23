@@ -184,6 +184,7 @@ This is a Streamlit-based project profitability dashboard called "Arkemy" for ar
 - `ui/dashboard.py` - Main dashboard orchestrator with hierarchical navigation
 - `ui/sidebar.py` - Filter interface and data selection
 - `pages/1_Analytics_Dashboard.py` - Unified data loading with hybrid volume/upload support
+- `pages/3_Project_Report.py` - Project Report page with period-based analytics
 
 **Data Management:**
 - `utils/unified_data_loader.py` - Schema-driven unified data loading system
@@ -194,6 +195,14 @@ This is a Streamlit-based project profitability dashboard called "Arkemy" for ar
 - Domain-specific chart modules (summary, project, customer, people, etc.)
 - Consistent render function pattern: `render_[domain]_tab(filtered_df, aggregate_func, render_chart, get_colors)`
 - Each module handles metric selection, aggregation, and multiple visualization types
+
+**Project Report Module:**
+- `period_processors/project_report.py` - Main Project Report functionality with parquet-to-CSV transformation
+- `period_charts/project_hours.py` - Hours analysis charts (actual vs planned)
+- `period_charts/project_fees.py` - Fees analysis charts with treemap and bar visualizations
+- `period_charts/project_rate.py` - Hourly rate analysis and comparisons
+- `period_utils/project_utils.py` - Project-specific utility functions
+- `period_utils/chart_utils.py` - Chart creation and formatting utilities
 
 **Utils Module:**
 - `processors.py` - Core aggregation functions (`aggregate_by_customer`, `aggregate_by_project`, etc.)
@@ -301,3 +310,73 @@ export ARKEMY_DEBUG=false
 - Application uses Streamlit caching for data operations
 - Memory management with garbage collection for large datasets
 - Automatic Parquet file detection and loading
+
+## 🏗️ Project Report Feature
+
+### Overview
+The Project Report feature provides period-based project analytics with actual vs planned comparisons. It transforms unified parquet data into project-focused visualizations and metrics.
+
+### Key Features
+- **Period Filtering**: Month, Quarter, Year, and Year-to-Date filtering options
+- **Actual vs Planned Analysis**: Compare worked hours/fees against planned values
+- **Multi-View Charts**: Hours, Fees, and Hourly Rate analysis tabs
+- **Visualization Types**: Bar charts (monthly trends) and treemaps (project distribution)
+- **Clean UI**: Minimal interface without redundant text or headers
+
+### Technical Implementation
+
+**Data Transformation**:
+- Transforms unified parquet schema to Project Report CSV format
+- Uses existing aggregation functions from `utils/processors.py`
+- Maps `fee_record` → "Period Fees Adjusted" (fees already adjusted in ETL)
+- Separates time_records (actual) and planned_records (forecasting) data
+
+**Key Mapping**:
+```
+project_number → Project ID (client-facing identifier)
+project_name → Project Name
+record_date → Period
+hours_used → Period Hours (actual hours worked)
+planned_hours → Planned Hours (forecasted hours)
+fee_record → Period Fees Adjusted (actual revenue)
+planned_fee → Planned Income (forecasted revenue)
+```
+
+**Period Filtering Logic**:
+- Quarter filter defaults to current year (2025) with fallback to most recent
+- Shows helpful warnings when no data exists for selected period
+- Validates data availability and guides users to periods with data
+
+**Chart Features**:
+- Hover templates with 0 decimal places and thousand separators
+- Color scheme: "Used" data gets darker colors, "Planned" gets lighter colors
+- Treemap with proper comma formatting for monetary values
+- Monthly bar charts with chronological ordering
+
+### File Structure
+```
+period_processors/
+  └── project_report.py          # Main processor with transformation logic
+period_charts/
+  ├── project_hours.py           # Hours analysis charts
+  ├── project_fees.py            # Fees analysis with treemap
+  └── project_rate.py            # Hourly rate comparisons
+period_utils/
+  ├── project_utils.py           # Project utility functions
+  └── chart_utils.py             # Chart creation and formatting
+pages/
+  └── 3_Project_Report.py        # Page entry point
+```
+
+### Data Requirements
+- Unified parquet file with both time_record and planned_record types
+- Required columns: record_type, project_number, project_name, record_date
+- Actual data: hours_used, hours_billable, fee_record
+- Planned data: planned_hours, planned_fee
+- Currency detection from filename or manual selection
+
+### Current Status: ✅ COMPLETE
+- Fully functional with clean UI
+- Integrated with existing data infrastructure
+- Proper error handling and user feedback
+- Production-ready with all requested features implemented
