@@ -74,9 +74,9 @@ def render_single_project_fees(df, project_name):
     hover_template = (
         f"<span style='font-size:16px'><b>%{{customdata[0]}}</b><br>"
         f"%{{x}}<br>"
-        f"%{{y:_.0f}} {t('kr')}</span><br>"
+        f"%{{y:,.0f}} {t('kr')}</span><br>"
         "<extra></extra>"
-    ).replace("_", " ")
+    )
     
     # Create and display the chart
     fig = create_bar_chart(
@@ -199,9 +199,9 @@ def render_all_projects_fees(df):
         hover_template = (
             f"<span style='font-size:16px'><b>%{{customdata[0]}}</b><br>"
             f"%{{x}}<br>"
-            f"%{{y:_.0f}} {t('kr')}</span><br>"
+            f"%{{y:,.0f}} {t('kr')}</span><br>"
             "<extra></extra>"
-        ).replace("_", " ")
+        )
         
         # Create and display the bar chart
         fig = create_bar_chart(
