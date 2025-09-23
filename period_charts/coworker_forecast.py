@@ -41,12 +41,12 @@ def render_person_chart(df, selected_person):
     
     # Translation mapping for categories and hover display
     translations_map = {
-        "Capacity/Period": t("capacity_period"),
-        "Planned hours": t("planned_hours"),
-        "Hours/Registered": t("hours_registered"),
-        "Project hours": t("billable_hours"),
-        "Unpaid work": t("non_billable_hours"),
-        "Hours/Period": t("hours_period")
+        "Capacity/Period": "Capacity",
+        "Planned hours": "Planned",
+        "Hours/Registered": "Registered",
+        "Project hours": "Billable",
+        "Unpaid work": "Non-billable",
+        "Hours/Period": "Schedule"
     }
     
     # Melt the DataFrame for plotting using the display column
@@ -109,8 +109,16 @@ def render_person_chart(df, selected_person):
     fig.update_xaxes(tickangle=45)
 
     fig.update_layout(
-    xaxis=dict(tickfont=dict(size=16)),
-    yaxis=dict(tickfont=dict(size=16))
+        xaxis=dict(tickfont=dict(size=16)),
+        yaxis=dict(tickfont=dict(size=16)),
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=1,
+            xanchor="left",
+            x=1.02,
+            font=dict(size=14)
+        )
     )
     
     # Display the chart

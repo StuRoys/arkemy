@@ -27,16 +27,10 @@ elif st.session_state.get('coworker_data') is not None:
 else:
     st.session_state.coworker_data = None
 
-# Create sidebar with data controls only
-with st.sidebar:
-    # Clear data button for coworker data
-    if st.session_state.coworker_data is not None:
-        if st.button("Clear uploaded coworker data", use_container_width=True):
-            st.session_state.coworker_data = None
-            st.rerun()
+# Sidebar will be populated by the processor
 
 # Main content
-st.header(t("title_coworker_report"))
+st.subheader(t("title_coworker_report"))
 
 # Handle coworker upload and rendering (sidebar will be populated by the processor)
 filtered_period_info, selected_person = handle_coworker_upload()
