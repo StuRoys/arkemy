@@ -9,8 +9,6 @@ from utils.admin_helpers import require_admin_access, render_admin_logout, is_ad
 
 def render_data_management_section():
     """Render comprehensive data management section."""
-    st.markdown("## 📊 Data Management")
-
     # Current data status
     render_current_data_status()
 
@@ -25,7 +23,7 @@ def render_data_management_section():
     render_file_management()
 
 def render_current_data_status():
-    """Show current data loading status."""
+    """Show current data loading status with detailed file information."""
     st.markdown("### 📈 Current Data Status")
 
     if st.session_state.get('csv_loaded', False) and st.session_state.transformed_df is not None:
@@ -46,12 +44,148 @@ def render_current_data_status():
             planned_df = st.session_state.transformed_planned_df
             st.success(f"📅 **Planned data loaded**: {len(planned_df):,} planned records")
 
-        # Data source info
-        data_source = "Local directory (./data)" if os.path.exists("./data") else "Production volume (/data)"
-        st.info(f"🔍 **Data source**: {data_source}")
+        # Detailed file information
+        render_detailed_file_info()
 
     else:
         st.warning("⚠️ **No data currently loaded**")
+        # Still show what files are available
+        render_available_files_info()
+
+def render_detailed_file_info():
+    """Show detailed information about loaded files."""
+    import glob
+    from datetime import datetime
+
+    data_dirs = ["./data", "/data"]
+    active_dir = None
+
+    # Find which directory exists and has files
+    for data_dir in data_dirs:
+        if os.path.exists(data_dir):
+            active_dir = data_dir
+            break
+
+    if not active_dir:
+        st.info("🔍 **Data source**: No data directory found")
+        return
+
+    st.info(f"🔍 **Data source**: {active_dir}")
+
+    # Show loaded files with details
+    files_info = []
+
+    # Main parquet file
+    parquet_files = glob.glob(os.path.join(active_dir, "*.parquet"))
+    for pf in parquet_files:
+        if os.path.isfile(pf):
+            stat = os.stat(pf)
+            size_mb = stat.st_size / (1024*1024)
+            mod_time = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+            files_info.append({
+                "type": "📊 Main Data",
+                "file": os.path.basename(pf),
+                "size": f"{size_mb:.1f} MB",
+                "modified": mod_time,
+                "status": "✅ Loaded" if st.session_state.get('csv_loaded') else "⚠️ Not loaded"
+            })
+
+    # Coworker CSV
+    coworker_files = glob.glob(os.path.join(active_dir, "*coworker*.csv"))
+    for cf in coworker_files:
+        if os.path.isfile(cf):
+            stat = os.stat(cf)
+            size_kb = stat.st_size / 1024
+            mod_time = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+            files_info.append({
+                "type": "👥 Coworker",
+                "file": os.path.basename(cf),
+                "size": f"{size_kb:.1f} KB",
+                "modified": mod_time,
+                "status": "✅ Available" if st.session_state.get('coworker_csv_loaded') else "💤 Available"
+            })
+
+    # SQM CSV
+    sqm_files = glob.glob(os.path.join(active_dir, "*sqm*.csv")) + glob.glob(os.path.join(active_dir, "*hrs_sqm*.csv"))
+    for sf in sqm_files:
+        if os.path.isfile(sf):
+            stat = os.stat(sf)
+            size_kb = stat.st_size / 1024
+            mod_time = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+            files_info.append({
+                "type": "🏗️ SQM Data",
+                "file": os.path.basename(sf),
+                "size": f"{size_kb:.1f} KB",
+                "modified": mod_time,
+                "status": "✅ Available"
+            })
+
+    # Logo files
+    logo_patterns = ['*logo*', '*arkemy*', '*brand*']
+    logo_extensions = ['.png', '.jpg', '.jpeg', '.svg']
+    for pattern in logo_patterns:
+        for ext in logo_extensions:
+            logo_files = glob.glob(os.path.join(active_dir, pattern + ext))
+            for lf in logo_files:
+                if os.path.isfile(lf):
+                    stat = os.stat(lf)
+                    size_kb = stat.st_size / 1024
+                    mod_time = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+                    files_info.append({
+                        "type": "🎨 Logo",
+                        "file": os.path.basename(lf),
+                        "size": f"{size_kb:.1f} KB",
+                        "modified": mod_time,
+                        "status": "✅ Active"
+                    })
+                    break  # Only show first matching logo
+            if logo_files:
+                break
+        if logo_files:
+            break
+
+    # Display files in a clean table
+    if files_info:
+        st.markdown("#### 📁 Active Files")
+        for file_info in files_info:
+            col1, col2, col3, col4 = st.columns([2, 3, 1, 1])
+            with col1:
+                st.write(file_info["type"])
+            with col2:
+                st.code(file_info["file"], language=None)
+            with col3:
+                st.write(file_info["size"])
+            with col4:
+                st.write(file_info["status"])
+
+def render_available_files_info():
+    """Show available files when no data is loaded."""
+    import glob
+
+    data_dirs = ["./data", "/data"]
+    for data_dir in data_dirs:
+        if os.path.exists(data_dir):
+            parquet_files = glob.glob(os.path.join(data_dir, "*.parquet"))
+            if parquet_files:
+                st.info(f"🔍 **Available data files in {data_dir}**:")
+                for pf in parquet_files:
+                    st.code(os.path.basename(pf), language=None)
+                break
+    else:
+        st.info("🔍 **No data directory found** - upload files to get started")
+
+def render_client_access():
+    """Render client access information."""
+    st.markdown("Share this URL with clients for dashboard access:")
+
+    # Try to get current URL, fallback to placeholder
+    try:
+        # This will work in most deployments
+        client_url = "https://your-app-url.com"  # Replace with actual deployment URL
+        st.code(client_url, language=None)
+        st.info("💡 **Tip**: Remove '/Admin' from the browser URL to get the client dashboard link")
+    except Exception:
+        st.info("💡 **Client URL**: Remove '/Admin' from the current browser URL")
 
 def render_data_operations():
     """Render data operation buttons."""
@@ -555,40 +689,6 @@ def render_debug_interface():
         icon = "✅" if value else "❌"
         st.write(f"{icon} {key}: {value}")
 
-def render_admin_interface():
-    """Render the main admin interface"""
-    st.subheader("🛠️ Admin")
-    st.markdown("Data management interface for client deployments")
-    
-    # Logout button in sidebar
-    with st.sidebar:
-        st.markdown("### Admin Controls")
-        if st.button("🚪 Logout", key="logout"):
-            st.session_state.admin_authenticated = False
-            st.rerun()
-        
-        st.markdown("---")
-        st.markdown("**Volume:** `/data`")
-    
-    # Volume statistics
-    render_volume_stats()
-    
-    st.markdown("---")
-    
-    # Main interface tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["📁 Browse Files", "📤 Upload Files", "🔗 Client Link", "🐛 Debug"])
-    
-    with tab1:
-        render_file_browser()
-    
-    with tab2:
-        render_file_uploader()
-    
-    with tab3:
-        render_client_link()
-    
-    with tab4:
-        render_debug_interface()
 
 # Main admin page logic
 st.subheader("🛠️ Admin")
@@ -600,25 +700,16 @@ if require_admin_access():
     # Show data management section
     render_data_management_section()
 
-    # Client access link
-    render_client_access()
-
     st.markdown("---")
 
-    # Additional tools (simplified legacy)
-    with st.expander("🔧 **Additional Tools**", expanded=False):
-        render_debug_interface()
+    # Client access and debug tools in expandable sections
+    col1, col2 = st.columns(2)
 
-def render_client_access():
-    """Render client access information."""
-    st.markdown("## 🔗 Client Access")
-    st.markdown("Share this URL with clients for dashboard access:")
+    with col1:
+        with st.expander("🔗 **Client Access**", expanded=False):
+            render_client_access()
 
-    # Try to get current URL, fallback to placeholder
-    try:
-        # This will work in most deployments
-        client_url = "https://your-app-url.com"  # Replace with actual deployment URL
-        st.code(client_url, language=None)
-        st.info("💡 **Tip**: Remove '/Admin' from the browser URL to get the client dashboard link")
-    except Exception:
-        st.info("💡 **Client URL**: Remove '/Admin' from the current browser URL")
+    with col2:
+        with st.expander("🔧 **Debug Tools**", expanded=False):
+            render_debug_interface()
+
