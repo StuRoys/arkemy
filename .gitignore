@@ -62,6 +62,7 @@ Thumbs.db
 .streamlit/
 
 # Data files (project specific)
+data/
 *.parquet
 *.csv
 *.xlsx
