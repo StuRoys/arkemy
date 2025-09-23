@@ -8,26 +8,200 @@ from period_charts.project_hours import render_project_hours_chart
 from period_charts.project_fees import render_project_fees_chart
 from period_charts.project_rate import render_project_rate_chart
 
+def transform_parquet_to_project_report(parquet_path):
+    """
+    Transform unified parquet data to Project Report CSV format.
+
+    Args:
+        parquet_path: Path to the unified parquet file
+
+    Returns:
+        DataFrame in Project Report format with columns:
+        - Project ID, Project Name, Period, Period Hours, Planned Hours, Period Fees, Planned Income
+    """
+    try:
+        # Import the existing aggregation function
+        from utils.processors import aggregate_project_by_month_year
+
+        # Load parquet data
+        df = pd.read_parquet(parquet_path)
+
+        # Ensure we have the required columns
+        required_cols = ['record_type', 'project_number', 'project_name', 'record_date']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            st.error(f"Missing required columns in parquet file: {missing_cols}")
+            return None
+
+        # Separate time_record and planned_record data
+        time_records = df[df['record_type'] == 'time_record'].copy()
+        planned_records = df[df['record_type'] == 'planned_record'].copy()
+
+        # Check if we have data
+        if time_records.empty and planned_records.empty:
+            st.warning("No time_record or planned_record data found in parquet file")
+            return None
+
+        # Create project + month aggregation manually (aggregate_project_by_month_year doesn't group by project)
+        project_month_data = []
+
+        # Process time_records (actual work)
+        if not time_records.empty:
+            time_records_copy = time_records.copy()
+            time_records_copy['Year'] = time_records_copy['record_date'].dt.year
+            time_records_copy['Month'] = time_records_copy['record_date'].dt.month
+
+            # Group by project + month + year
+            actual_agg = time_records_copy.groupby(['project_number', 'project_name', 'Year', 'Month']).agg({
+                'hours_used': 'sum',
+                'hours_billable': 'sum',
+                'fee_record': 'sum'
+            }).reset_index()
+
+            # Add period date
+            actual_agg['Period'] = pd.to_datetime(actual_agg[['Year', 'Month']].assign(day=1))
+
+            project_month_data.append(actual_agg)
+
+        # Process planned_records (planned work)
+        if not planned_records.empty:
+            planned_records_copy = planned_records.copy()
+            planned_records_copy['Year'] = planned_records_copy['record_date'].dt.year
+            planned_records_copy['Month'] = planned_records_copy['record_date'].dt.month
+
+            # Group by project + month + year
+            planned_agg = planned_records_copy.groupby(['project_number', 'project_name', 'Year', 'Month']).agg({
+                'planned_hours': 'sum',
+                'planned_fee': 'sum'
+            }).reset_index()
+
+            # Add period date
+            planned_agg['Period'] = pd.to_datetime(planned_agg[['Year', 'Month']].assign(day=1))
+
+            project_month_data.append(planned_agg)
+
+        if not project_month_data:
+            st.warning("No project+month data generated")
+            return None
+
+        # Merge actual and planned data
+        if len(project_month_data) == 2:
+            # Both actual and planned data exist - merge them
+            actual_df, planned_df_agg = project_month_data
+            monthly_data = pd.merge(
+                actual_df,
+                planned_df_agg,
+                on=['project_number', 'project_name', 'Year', 'Month', 'Period'],
+                how='outer'
+            )
+        else:
+            # Only one type exists
+            monthly_data = project_month_data[0]
+
+        # Fill NaN values with 0
+        numeric_cols = ['hours_used', 'hours_billable', 'fee_record', 'planned_hours', 'planned_fee']
+        for col in numeric_cols:
+            if col in monthly_data.columns:
+                monthly_data[col] = monthly_data[col].fillna(0)
+
+        if monthly_data.empty:
+            st.warning("No aggregated data generated from parquet file")
+            return None
+
+        # Transform to Project Report expected format
+        project_report_df = monthly_data.copy()
+
+        # Create Period column from Year and Month
+        if 'Year' in project_report_df.columns and 'Month' in project_report_df.columns:
+            # Create datetime from Year and Month, then format as YYYY-MM-DD
+            project_report_df['Period'] = pd.to_datetime(
+                project_report_df[['Year', 'Month']].assign(day=1)
+            )
+        elif 'record_date' in project_report_df.columns:
+            project_report_df['Period'] = pd.to_datetime(project_report_df['record_date'])
+        else:
+            st.error("Cannot create Period column - missing Year/Month or record_date")
+            return None
+
+        # Rename columns to Project Report expected format
+        column_mapping = {
+            'project_number': 'Project ID',
+            'project_name': 'Project Name',
+            'hours_used': 'Period Hours',
+            'planned_hours': 'Planned Hours',
+            'fee_record': 'Period Fees Adjusted',  # Charts expect "Period Fees Adjusted"
+            'planned_fee': 'Planned Income'
+        }
+
+        # Apply renaming only for columns that exist
+        existing_mapping = {k: v for k, v in column_mapping.items() if k in project_report_df.columns}
+        project_report_df = project_report_df.rename(columns=existing_mapping)
+
+        # Select only the columns Project Report expects
+        expected_columns = ['Project ID', 'Project Name', 'Period', 'Period Hours', 'Planned Hours', 'Period Fees Adjusted', 'Planned Income']
+
+        # Fill missing columns with 0 or appropriate defaults
+        for col in expected_columns:
+            if col not in project_report_df.columns:
+                if col in ['Period Hours', 'Planned Hours']:
+                    project_report_df[col] = 0.0
+                elif col in ['Period Fees Adjusted', 'Planned Income']:
+                    project_report_df[col] = 0.0
+                else:
+                    project_report_df[col] = ""
+
+        # Select and reorder columns
+        project_report_df = project_report_df[expected_columns]
+
+        # Sort by Project Name and Period for better readability
+        project_report_df = project_report_df.sort_values(['Project Name', 'Period'])
+
+        return project_report_df
+
+    except Exception as e:
+        st.error(f"Error transforming parquet to project report format: {str(e)}")
+        return None
+
 def get_data_directory():
-    """Get the appropriate data directory - Railway volume or local"""
-    # Check for Railway volume first
+    """Get the appropriate data directory - prioritize project data over temp"""
+    # First priority: Railway volume (production environment)
     if os.path.exists("/data"):
         return "/data"
-    # Check for local temp directory
-    elif os.path.exists(os.path.expanduser("~/temp_data")):
-        return os.path.expanduser("~/temp_data")
-    # Fallback to local data directory
-    else:
-        return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+
+    # Second priority: Project data directory (preferred for development)
+    project_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+    if os.path.exists(project_data_dir):
+        return project_data_dir
+
+    # Third priority: Local temp directory (fallback)
+    temp_data_dir = os.path.expanduser("~/temp_data")
+    if os.path.exists(temp_data_dir):
+        return temp_data_dir
+
+    # Final fallback: Create project data directory
+    return project_data_dir
 
 def try_autoload_project_data():
     """Try to autoload project data from data directory."""
     data_dir = get_data_directory()
-    
-    # Look for CSV files that might contain project data
+
+    # First, try to find and transform parquet files (preferred method)
+    parquet_files = glob.glob(os.path.join(data_dir, '*.parquet'))
+    for parquet_path in parquet_files:
+        try:
+            # Try to transform parquet to project report format
+            transformed_df = transform_parquet_to_project_report(parquet_path)
+            if transformed_df is not None and not transformed_df.empty:
+                st.success(f"Loaded project data from {os.path.basename(parquet_path)} (transformed from unified schema)")
+                return transformed_df
+        except Exception as e:
+            st.warning(f"Could not transform {os.path.basename(parquet_path)}: {str(e)}")
+            continue
+
+    # Fallback: Look for CSV files that might contain project data
     # Common patterns: project*.csv, prosjekt*.csv (Norwegian)
     patterns = ['*project_report*.csv', 'project*.csv', 'prosjekt*.csv']
-    
+
     for pattern in patterns:
         files = glob.glob(os.path.join(data_dir, pattern))
         if files:
@@ -35,23 +209,25 @@ def try_autoload_project_data():
             filepath = files[0]
             try:
                 df = pd.read_csv(filepath)
+                st.info(f"Loaded project data from {os.path.basename(filepath)} (CSV format)")
                 return df
             except Exception as e:
                 st.warning(f"Could not load {os.path.basename(filepath)}: {str(e)}")
                 continue
-    
+
     # If no pattern matches, try to load any CSV and check if it has project-like columns
     csv_files = glob.glob(os.path.join(data_dir, '*.csv'))
     for filepath in csv_files:
         try:
             df = pd.read_csv(filepath)
             # Check if it has typical project columns
-            project_columns = ['Project ID', 'Project Name', 'Period Hours', 'Period Fees']
+            project_columns = ['Project ID', 'Project Name', 'Period Hours', 'Period Fees Adjusted']
             if any(col in df.columns for col in project_columns):
+                st.info(f"Loaded project data from {os.path.basename(filepath)} (detected CSV format)")
                 return df
         except Exception as e:
             continue
-    
+
     return None
 
 def create_project_per_month_table(df):
@@ -75,8 +251,8 @@ def render_project_table(df):
     """Render a table showing project data with translated headers."""
     # Check required columns
     required_columns = [
-        "Project ID", "Project Name", "Period", "Period Hours", 
-        "Planned Hours", "Period Fees", "Planned Income"
+        "Project ID", "Project Name", "Period", "Period Hours",
+        "Planned Hours", "Period Fees Adjusted", "Planned Income"
     ]
     
     missing_columns = [col for col in required_columns if col not in df.columns]
@@ -91,7 +267,7 @@ def render_project_table(df):
         "Period": t("period_label"),
         "Period Hours": t("period_hours"),
         "Planned Hours": t("planned_hours"),
-        "Period Fees": t("period_fees"),
+        "Period Fees Adjusted": t("period_fees"),
         "Planned Income": t("planned_income"),
    }
     
@@ -103,7 +279,7 @@ def render_project_table(df):
     column_config = {}
     
     # Add number formatting for currency columns
-    fees_translated = translation_mapping["Period Fees"]
+    fees_translated = translation_mapping["Period Fees Adjusted"]
     income_translated = translation_mapping["Planned Income"]
     
     column_config[fees_translated] = st.column_config.NumberColumn(format="%.2f")
@@ -532,7 +708,7 @@ def handle_project_upload():
     # Check required columns
     project_columns = [
         "Project ID", "Project Name", "Period", "Period Hours",
-        "Planned Hours", "Period Fees", "Planned Income"
+        "Planned Hours", "Period Fees Adjusted", "Planned Income"
     ]
             
     missing_columns = [col for col in project_columns if col not in project_df.columns]
