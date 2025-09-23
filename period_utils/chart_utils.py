@@ -175,11 +175,11 @@ def create_color_map(value_cols, scheme="blue"):
         Mapping of column names to colors
     """
     if scheme == "blue":
-        colors = ["#1f77b4", "#7fcdff"]  # Darker blue, Lighter blue
+        colors = ["#7fcdff", "#1f77b4"]  # Lighter blue, Darker blue (inverse so 'used' gets darker)
     elif scheme == "green":
-        colors = ["#2ca02c", "#98df8a"]  # Darker green, Lighter green
+        colors = ["#98df8a", "#2ca02c"]  # Lighter green, Darker green (inverse so 'used' gets darker)
     elif scheme == "purple":
-        colors = ["#9467bd", "#c5b0d5"]  # Darker purple, Lighter purple
+        colors = ["#c5b0d5", "#9467bd"]  # Lighter purple, Darker purple (inverse so 'used' gets darker)
     else:
         colors = ["#1f77b4", "#ff7f0e"]  # Default blue and orange
     
@@ -191,7 +191,7 @@ def create_color_map(value_cols, scheme="blue"):
     
     return color_map
 
-def create_hover_template(include_units=False, unit_text="", decimal_places=1):
+def create_hover_template(include_units=False, unit_text="", decimal_places=0):
     """Create a standardized hover template.
     
     Parameters:
