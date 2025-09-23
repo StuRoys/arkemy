@@ -10,16 +10,23 @@ from period_charts.coworker_utils import render_details_section, render_data_sec
 from period_translations.translations import t
 
 def get_data_directory():
-    """Get the appropriate data directory - Railway volume or local"""
-    # Check for Railway volume first
+    """Get the appropriate data directory - prioritize project data over temp"""
+    # First priority: Railway volume (production environment)
     if os.path.exists("/data"):
         return "/data"
-    # Check for local temp directory
-    elif os.path.exists(os.path.expanduser("~/temp_data")):
-        return os.path.expanduser("~/temp_data")
-    # Fallback to local data directory
-    else:
-        return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+
+    # Second priority: Project data directory (preferred for development)
+    project_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+    if os.path.exists(project_data_dir):
+        return project_data_dir
+
+    # Third priority: Local temp directory (fallback)
+    temp_data_dir = os.path.expanduser("~/temp_data")
+    if os.path.exists(temp_data_dir):
+        return temp_data_dir
+
+    # Final fallback: Create project data directory
+    return project_data_dir
 
 def try_autoload_coworker_data():
     """Try to autoload coworker data from data directory."""
@@ -349,6 +356,56 @@ def render_sidebar_filters(df=None):
     
     return filter_params, selected_person
 
+def render_upload_interface():
+    """Render CSV file upload interface for coworker data."""
+    st.error("📂 No coworker data found")
+    st.markdown("""
+    **To view coworker reports, either:**
+    1. Place a CSV file in the `/data` or `./data` directory with one of these naming patterns:
+       - `*coworker_report*.csv`, `coworker*.csv`, `person*.csv`, `employee*.csv`, `medarbeider*.csv`, `people*.csv`
+
+    2. **Or upload a file below:**
+    """)
+
+    # File uploader
+    uploaded_file = st.file_uploader(
+        "Choose a CSV file",
+        type=['csv'],
+        help="Upload a CSV file with coworker data"
+    )
+
+    if uploaded_file is not None:
+        st.info(f"📁 **File selected**: `{uploaded_file.name}` ({round(len(uploaded_file.getvalue()) / (1024*1024), 2)} MB)")
+
+        with st.spinner("Processing file..."):
+            try:
+                # Read CSV file
+                df = pd.read_csv(uploaded_file, usecols=lambda x: x != 'Unnamed: 0')
+
+                # Store in session state
+                st.session_state.coworker_data = df
+
+                st.success("🎉 **File processed successfully!**")
+                st.info(f"Loaded {len(df):,} records")
+
+            except Exception as e:
+                st.error(f"❌ **File processing failed**: {str(e)}")
+
+    st.markdown("""
+    **Expected CSV structure:**
+    - Period (in datetime format)
+    - Person
+    - Hours/Period
+    - Capacity/Period
+    - Absence/Period
+    - Hours/Registered
+    - Project hours
+    - Planned hours
+    - Unpaid work
+    """)
+
+    return None, None
+
 def handle_coworker_upload(filter_params=None, selected_person=None):
     """
     Handle the upload of coworker CSV data and render charts and table.
@@ -363,42 +420,28 @@ def handle_coworker_upload(filter_params=None, selected_person=None):
     # Initialize period filter info
     filtered_period_info = None
     
-    # Check if data already exists in session state
-    if st.session_state.coworker_data is None:
+    # If data already exists, use it directly (skip all upload logic)
+    if st.session_state.coworker_data is not None:
+        df = st.session_state.coworker_data
+    else:
+        # No data exists - try to get it
         # Try to autoload data first
         autoloaded_data = try_autoload_coworker_data()
-        
+
         if autoloaded_data is not None:
             # Store autoloaded data in session state
             st.session_state.coworker_data = autoloaded_data
             df = autoloaded_data
         else:
-            # No data found - show error message
-            st.error("📂 No coworker data found in /data directory")
-            st.markdown("""
-            **To view coworker reports, place a CSV file in the `/data` directory with one of these naming patterns:**
-            - `*coworker_report*.csv`
-            - `coworker*.csv`
-            - `person*.csv`
-            - `employee*.csv`
-            - `medarbeider*.csv`
-            - `people*.csv`
-            
-            **Expected CSV structure:**
-            - Period (in datetime format)
-            - Person
-            - Hours/Period
-            - Capacity/Period
-            - Absence/Period
-            - Hours/Registered
-            - Project hours
-            - Planned hours
-            - Unpaid work
-            """)
-            return filtered_period_info, selected_person
-    else:
-        # Use existing data from session state
-        df = st.session_state.coworker_data
+            # No data found - show upload interface
+            render_upload_interface()
+
+            # If still no data after upload interface, return early
+            if st.session_state.coworker_data is None:
+                return filtered_period_info, selected_person
+
+            # Use uploaded data
+            df = st.session_state.coworker_data
     
     # Ensure Period is in datetime format
     if "Period" in df.columns:

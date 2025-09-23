@@ -19,8 +19,13 @@ if 'translations' not in st.session_state:
 if 'period_report_coworker_data' not in st.session_state:
     st.session_state.period_report_coworker_data = None
 
-# Temporary mapping for backward compatibility with period_report code
-st.session_state.coworker_data = st.session_state.period_report_coworker_data
+# Bidirectional sync - preserve data from either source
+if st.session_state.period_report_coworker_data is not None:
+    st.session_state.coworker_data = st.session_state.period_report_coworker_data
+elif st.session_state.get('coworker_data') is not None:
+    st.session_state.period_report_coworker_data = st.session_state.coworker_data
+else:
+    st.session_state.coworker_data = None
 
 # Create sidebar with data controls only
 with st.sidebar:
