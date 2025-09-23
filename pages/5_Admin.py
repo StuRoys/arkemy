@@ -557,7 +557,7 @@ def render_debug_interface():
 
 def render_admin_interface():
     """Render the main admin interface"""
-    st.title("🛠️ Arkemy Admin Panel")
+    st.subheader("🛠️ Admin")
     st.markdown("Data management interface for client deployments")
     
     # Logout button in sidebar
@@ -591,7 +591,7 @@ def render_admin_interface():
         render_debug_interface()
 
 # Main admin page logic
-st.title("🛠️ Admin Panel")
+st.subheader("🛠️ Admin")
 
 if require_admin_access():
     # Show logout button

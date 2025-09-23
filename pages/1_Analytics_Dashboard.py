@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import os
+import glob
 
 # Set page configuration
 st.set_page_config(
@@ -17,6 +19,47 @@ def is_debug_mode():
         return True
     # Fall back to session state for development
     return st.session_state.get('debug_mode', False)
+
+def get_data_directory():
+    """Get the appropriate data directory - prioritize project data over temp"""
+    # First priority: Railway volume (production environment)
+    if os.path.exists("/data"):
+        return "/data"
+
+    # Second priority: Project data directory (preferred for development)
+    project_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+    if os.path.exists(project_data_dir):
+        return project_data_dir
+
+    # Third priority: Local temp directory (fallback)
+    temp_data_dir = os.path.expanduser("~/temp_data")
+    if os.path.exists(temp_data_dir):
+        return temp_data_dir
+
+    # Final fallback: Create project data directory
+    return project_data_dir
+
+def try_load_logo():
+    """Try to load logo from data directory."""
+    data_dir = get_data_directory()
+
+    # Look for logo files with common patterns
+    patterns = ['*logo*', '*arkemy*', '*brand*']
+    extensions = ['.png', '.jpg', '.jpeg', '.svg']
+
+    for pattern in patterns:
+        for ext in extensions:
+            files = glob.glob(os.path.join(data_dir, pattern + ext))
+            if files:
+                # Use the first matching file
+                filepath = files[0]
+                try:
+                    # Return the file path for st.logo
+                    return filepath
+                except Exception as e:
+                    continue
+
+    return None
 
 # Initialize session state variables
 if 'csv_loaded' not in st.session_state:
@@ -210,6 +253,9 @@ def render_data_loaded_status():
 
 def main():
     """Main page logic."""
+
+    # Page header
+    st.subheader("📊 Analytics Dashboard")
 
     # Try to load data
     data_loaded = render_data_loading_interface()

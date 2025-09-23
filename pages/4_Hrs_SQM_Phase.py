@@ -5,12 +5,12 @@ import os
 import glob
 
 st.set_page_config(
-    page_title="Hrs SQM Phase Analysis",
+    page_title="Hours / m2 / phase (beta)",
     page_icon="🏗️",
     layout="wide"
 )
 
-st.subheader("🏗️ Hrs SQM Phase Analysis")
+st.subheader("🏗️ Hours / m2 / phase (beta)")
 #st.markdown("Calculate hours per square meter across different project phases")
 
 def get_data_directory():

@@ -28,23 +28,17 @@ def render_admin_login() -> bool:
     Returns:
         bool: True if login was successful, False otherwise
     """
-    st.markdown("### 🔐 Admin Access Required")
-    st.markdown("Enter password to access administrative features.")
-
     password = st.text_input("Password", type="password", key="admin_password_login",
-                             help="Enter admin password", autocomplete="current-password")
+                             autocomplete="current-password", label_visibility="collapsed")
 
-    col1, col2, col3 = st.columns([1, 1, 2])
-
-    with col2:
-        if st.button("Login", key="admin_login_btn"):
-            if password == ADMIN_PASSWORD:
-                st.session_state.admin_authenticated = True
-                st.success("Access granted!")
-                st.rerun()
-                return True
-            else:
-                st.error("Invalid password")
+    if password:
+        if password == ADMIN_PASSWORD:
+            st.session_state.admin_authenticated = True
+            st.success("Access granted!")
+            st.rerun()
+            return True
+        else:
+            st.error("Invalid password")
 
     return False
 
