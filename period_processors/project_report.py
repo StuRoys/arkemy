@@ -501,12 +501,26 @@ def apply_project_period_filter(df, filter_params):
     elif filter_type == t('quarters'):
         selected_year = filter_params.get('year')
         quarter_num = filter_params.get('quarter')
-        
-        # Filter for selected year and quarter
-        year_filter = filtered_df["Period"].dt.year == selected_year
-        quarter_filter = filtered_df["Period"].dt.quarter == quarter_num
-        filtered_df = filtered_df[year_filter & quarter_filter]
-        
+
+        # Debug: Check available quarters in the data for the selected year
+        year_data = filtered_df[filtered_df["Period"].dt.year == selected_year]
+        if not year_data.empty:
+            available_quarters = sorted(year_data["Period"].dt.quarter.unique())
+
+            # Filter for selected year and quarter
+            year_filter = filtered_df["Period"].dt.year == selected_year
+            quarter_filter = filtered_df["Period"].dt.quarter == quarter_num
+            filtered_df = filtered_df[year_filter & quarter_filter]
+
+            # Show helpful message if no data exists for selected quarter
+            if filtered_df.empty:
+                quarter_names = {1: "Q1", 2: "Q2", 3: "Q3", 4: "Q4"}
+                available_quarter_names = [quarter_names[q] for q in available_quarters]
+                st.warning(f"No data found for Q{quarter_num} {selected_year}. Available quarters: {', '.join(available_quarter_names)}")
+        else:
+            filtered_df = filtered_df.iloc[0:0]  # Empty dataframe
+            st.warning(f"No data found for year {selected_year}")
+
         filtered_period_info['year'] = selected_year
         filtered_period_info['quarter'] = quarter_num
     
@@ -745,16 +759,13 @@ def handle_project_upload():
     all_projects_option = t('filter_all_projects')
     
     with hours_tab:
-        st.header(t("project_hours_chart") if "project_hours_chart" in st.session_state.translations 
-                else "Project Hours")
+        # Header removed - tab name already indicates content
         render_project_hours_chart(filtered_df, selected_project, all_projects_option)
-    
+
     with fees_tab:
-        st.header(t("project_fees_chart") if "project_fees_chart" in st.session_state.translations 
-                else "Project Fees")
+        # Header removed - tab name already indicates content
         render_project_fees_chart(filtered_df, selected_project, all_projects_option)
-    
+
     with rate_tab:
-        st.header(t("project_rate_chart") if "project_rate_chart" in st.session_state.translations 
-                else "Project Rate")
+        # Header removed - tab name already indicates content
         render_project_rate_chart(filtered_df, selected_project, all_projects_option)

@@ -63,7 +63,7 @@
   "target_billable_rate": "Target for billable rate",
   "billable_rate_percent": "Billable rate %",
   "data": "Data",
-  "summary": "Summary for selected period",
+  "summary": "Summary",
   "period_hours": "Registered hours",
   "hours_difference": "Worked vs Planned",
   "hrs": "hrs",
