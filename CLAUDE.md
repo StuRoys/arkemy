@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## 🚨 CRITICAL - READ FIRST
-- **Project Location**: `~/code/arkemy/` (standard professional location)
+- **Project Location**: `~/code/arkemy_app/arkemy`
 - **NEVER commit directly to main branch** (production-only)
 - **Current development**: Work in `develop` branch for safety
 - **Test command**: `streamlit run main.py`
@@ -127,18 +127,53 @@ pip install -r requirements.txt
 
 **Note:** If Railway MCP tools are not available, restart Claude Code to reload MCP servers.
 
+## 🎯 BUSINESS PURPOSE - CRITICAL UNDERSTANDING
+
+### What is Arkemy?
+Arkemy is a **project profitability analytics dashboard** for architecture firms that need to:
+- **Track actual time spent** on projects vs planned hours
+- **Analyze project profitability** in real-time
+- **Forecast resource allocation** and capacity planning
+- **Compare planned vs actual performance** across projects, people, and time periods
+
+### Core Business Concepts:
+- **time_records**: ACTUAL hours worked by people on projects (historical data)
+- **planned_records**: FUTURE hours/fees planned for projects (forecasting data)
+- **Unified Loading**: Both record types loaded from same file for simplified data management
+
 ## Architecture Overview
 
 ### Application Structure
-This is a Streamlit-based data analytics dashboard called "Arkemy" (v1.3.3) for analyzing architecture project data. The app automatically loads Parquet files from the project root and provides comprehensive analytics across multiple business dimensions.
+This is a Streamlit-based project profitability dashboard called "Arkemy" for architecture firms. The app uses a unified schema-driven system to load and analyze both actual time tracking data and planned hours/forecasting data from single parquet files.
 
-### Core Data Flow
-1. **Data Loading**: Automatic Parquet file detection and loading from project root
-2. **Validation & Transformation**: Schema validation and data type conversion via `utils/data_validation.py`
-3. **Enrichment**: Optional person/project reference data integration
-4. **Filtering**: Multi-dimensional filtering system via sidebar
-5. **Aggregation**: Domain-specific data aggregation functions in `utils/processors.py`
-6. **Visualization**: Modular chart system with consistent styling
+### Core Data Flow (Unified Schema-Driven System)
+1. **Unified Data Loading**: Single parquet file contains both time_records and planned_records
+2. **Record Type Separation**: Uses `record_type` column to distinguish actual vs planned data
+3. **Schema-Driven Validation**: YAML schema in `utils/arkemy_schema.yaml` drives all validation
+4. **Data Processing**: Separate dataframes for analysis (`transformed_df` + `transformed_planned_df`)
+5. **Filtering**: Multi-dimensional filtering system via sidebar
+6. **Aggregation**: Domain-specific data aggregation functions in `utils/processors.py`
+7. **Analytics**: Compare actual vs planned across multiple business dimensions
+8. **Visualization**: Modular chart system with consistent styling
+
+## 📊 DATA TYPES - FUNDAMENTAL UNDERSTANDING
+
+### time_record (Actual Hours Worked)
+- **Purpose**: Track ACTUAL time spent on projects by team members
+- **Source**: Time tracking systems, timesheets, logged work hours
+- **Use Cases**: Profitability analysis, performance tracking, billing
+- **Key Fields**: `hours_used`, `hours_billable`, `billable_rate_record`, `cost_hour`
+
+### planned_record (Future Hours/Fees Planned)
+- **Purpose**: Track PLANNED/FORECASTED hours and fees for upcoming work
+- **Source**: Project planning, resource allocation, capacity planning
+- **Use Cases**: Workload forecasting, resource planning, budget comparison
+- **Key Fields**: `hours_used` (planned hours), `planned_rate`, cost projections
+
+### Unified File Benefits
+- **Simplified Data Management**: One file instead of multiple sources
+- **Consistent Schema**: Same validation rules across both record types
+- **Easy Comparison**: Analyze planned vs actual in single dashboard
 
 ### Key Components
 
@@ -148,7 +183,12 @@ This is a Streamlit-based data analytics dashboard called "Arkemy" (v1.3.3) for 
 **UI Layer:**
 - `ui/dashboard.py` - Main dashboard orchestrator with hierarchical navigation
 - `ui/sidebar.py` - Filter interface and data selection
-- `ui/parquet_processor.py` - Data loading and transformation pipeline
+- `pages/1_Analytics_Dashboard.py` - Unified data loading with hybrid volume/upload support
+
+**Data Management:**
+- `utils/unified_data_loader.py` - Schema-driven unified data loading system
+- `utils/schema_manager.py` - YAML schema management and validation
+- `utils/arkemy_schema.yaml` - Central schema definition for all data types
 
 **Charts Module:**
 - Domain-specific chart modules (summary, project, customer, people, etc.)
@@ -158,7 +198,6 @@ This is a Streamlit-based data analytics dashboard called "Arkemy" (v1.3.3) for 
 **Utils Module:**
 - `processors.py` - Core aggregation functions (`aggregate_by_customer`, `aggregate_by_project`, etc.)
 - `filters.py` / `date_filter.py` - Advanced filtering system with include/exclude patterns
-- `data_validation.py` - Schema validation and transformation
 - `chart_styles.py` - Centralized styling and formatting
 - `currency_formatter.py` - Multi-currency support (50+ currencies)
 
@@ -177,15 +216,20 @@ def aggregate_by_[domain](df, metric_column):
 **Filter Integration:**
 Charts receive pre-filtered data via `render_sidebar_filters()` which applies all active filters and returns both filtered dataframes and filter settings for display.
 
-**Planned vs Actual Data:**
-The system supports dual data streams - actual timesheet data and planned hours data - with variance calculations and time-based forecasting.
+**Actual vs Planned Analysis:**
+The system analyzes two fundamental data types:
+- **time_records**: Historical data of actual time spent on projects
+- **planned_records**: Forecasting data for planned hours and fees
+- **Variance Analysis**: Compare planned vs actual performance across projects, people, and time periods
 
 ### Session State Management
 Critical session state variables:
-- `transformed_df` - Main processed dataframe
-- `transformed_planned_df` - Planned hours dataframe  
+- `transformed_df` - **Actual time tracking data** (time_records only)
+- `transformed_planned_df` - **Planned hours/forecasting data** (planned_records only)
 - `currency` - Selected currency for formatting
 - `data_version` - Dataset version selector ("adjusted" or "regular")
+- `csv_loaded` - Flag indicating actual time data is loaded
+- `planned_csv_loaded` - Flag indicating planned data is loaded
 - Navigation states for UI persistence
 - Filter states for sidebar persistence
 - `debug_mode` - Toggle for debug information display
@@ -197,7 +241,7 @@ Built-in support for 50+ currencies with proper formatting, symbol positioning, 
 
 **File Naming Convention:**
 - Data files should include currency code in filename for auto-detection
-- Parquet files are automatically detected in project root
+- Unified parquet files contain both time_records and planned_records
 - Dataset versioning: `*_regular.parquet` for regular values, `*_adjusted.parquet` for adjusted values
 - App supports single or dual dataset operation with automatic detection
 
@@ -208,10 +252,15 @@ Built-in support for 50+ currencies with proper formatting, symbol positioning, 
 4. Use shared utilities from `chart_styles.py` and `chart_helpers.py`
 
 **Data Requirements:**
-- Core schema defined in `data_validation.py` with required columns (Date, Person, Project, Hours worked, etc.)
-- Optional planned data schema in `planned_validation.py`
-- Reference data for person types and project metadata enrichment
+- Schema defined in `utils/arkemy_schema.yaml` with field types and validation rules
+- Unified files must contain `record_type` column to distinguish time_records vs planned_records
+- Required fields vary by record type (see schema for details)
 - Adjusted data columns: `fee_record_adjust`, `cost_hour_adjust`, `cost_record_adjust`, `profit_hour_adjust`, `profit_record_adjust`
+
+**Schema Management:**
+- Edit `utils/arkemy_schema.yaml` to modify field requirements, add new record types, or change validation rules
+- No code changes needed for schema updates - system is fully schema-driven
+- Schema supports both required and optional fields per record type
 
 ### Dataset Toggle System
 **Dual Dataset Support:**

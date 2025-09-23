@@ -49,10 +49,6 @@ MAIN_SCHEMA = {
     "cost_record": "float", # "cost_hour" * "hours_used"
     "cost_hour_adjust": "float", #calculated in ETL using index
     "cost_record_adjust": "float", # "cost_hour_adjust" * "hours_used"
-    "profit_hour": "float", # "billable_rate_record" - "cost_hour"
-    "profit_record": "float", # "profit_hour" * "hours_used"
-    "profit_hour_adjust": "float", # "billable_rate_adjust" - "cost_hour_adjust"
-    "profit_record_adjust": "float", # "profit_hour_adjust" * "hours_used"
     "planned_hours": "float",
     "planned_billable": "float",
     "planned_hourly_rate": "float",
@@ -76,7 +72,7 @@ MAIN_OPTIONAL_COLUMNS = ["billable_rate_adjust", "person_type", "customer_number
                     "fee_record", "cost_hour", "cost_record",
                     "profit_per_record", "profit_per_hour", "planned_billable", "data_source",
                     "fee_record_adjust", "cost_hour_adjust", "cost_record_adjust", 
-                    "profit_hour_adjust", "profit_record_adjust"]
+                    "profit_hour", "profit_record", "profit_hour_adjust", "profit_record_adjust"]
 
 PLANNED_OPTIONAL_COLUMNS = ["planned_hourly_rate"]
 
