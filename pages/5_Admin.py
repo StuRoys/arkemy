@@ -4,33 +4,261 @@ import os
 import sys
 from datetime import datetime
 
-# Admin password (you can change this)
-ADMIN_PASSWORD = "arkemy2024"
+# Import admin utilities
+from utils.admin_helpers import require_admin_access, render_admin_logout, is_admin_authenticated
 
-def check_admin_access():
-    """Check if user has admin access"""
-    if 'admin_authenticated' not in st.session_state:
-        st.session_state.admin_authenticated = False
-    
-    return st.session_state.admin_authenticated
+def render_data_management_section():
+    """Render comprehensive data management section."""
+    st.markdown("## 📊 Data Management")
 
-def render_admin_login():
-    """Render admin login form"""
-    st.title("🔐 Admin Access")
-    st.markdown("Enter password to access data management interface.")
-    
-    password = st.text_input("Password", type="password", key="admin_password")
-    
-    col1, col2, col3 = st.columns([1, 1, 2])
-    
+    # Current data status
+    render_current_data_status()
+
+    st.markdown("---")
+
+    # Data operations
+    render_data_operations()
+
+    st.markdown("---")
+
+    # File management
+    render_file_management()
+
+def render_current_data_status():
+    """Show current data loading status."""
+    st.markdown("### 📈 Current Data Status")
+
+    if st.session_state.get('csv_loaded', False) and st.session_state.transformed_df is not None:
+        df = st.session_state.transformed_df
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("📊 Total Records", f"{len(df):,}")
+        with col2:
+            st.metric("👥 People", df['person_name'].nunique() if 'person_name' in df.columns else 'N/A')
+        with col3:
+            st.metric("📁 Projects", df['project_number'].nunique() if 'project_number' in df.columns else 'N/A')
+        with col4:
+            st.metric("💱 Currency", st.session_state.currency.upper())
+
+        # Planned data status
+        if st.session_state.get('planned_csv_loaded', False) and st.session_state.transformed_planned_df is not None:
+            planned_df = st.session_state.transformed_planned_df
+            st.success(f"📅 **Planned data loaded**: {len(planned_df):,} planned records")
+
+        # Data source info
+        data_source = "Local directory (./data)" if os.path.exists("./data") else "Production volume (/data)"
+        st.info(f"🔍 **Data source**: {data_source}")
+
+    else:
+        st.warning("⚠️ **No data currently loaded**")
+
+def render_data_operations():
+    """Render data operation buttons."""
+    st.markdown("### 🔄 Data Operations")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        if st.button("🔄 **Reload Data**", key="admin_reload_main", use_container_width=True):
+            # Clear session state to trigger reload
+            st.session_state.csv_loaded = False
+            st.session_state.transformed_df = None
+            st.session_state.planned_csv_loaded = False
+            st.session_state.transformed_planned_df = None
+            st.success("Data state cleared. Navigate to Analytics Dashboard to reload.")
+
     with col2:
-        if st.button("Login", key="admin_login"):
-            if password == ADMIN_PASSWORD:
-                st.session_state.admin_authenticated = True
-                st.success("Access granted!")
+        debug_mode = st.session_state.get('debug_mode', False)
+        if st.button(f"🐛 **Debug: {'ON' if debug_mode else 'OFF'}**", key="toggle_debug", use_container_width=True):
+            st.session_state.debug_mode = not debug_mode
+            st.success(f"Debug mode {'enabled' if not debug_mode else 'disabled'}")
+
+    with col3:
+        if st.button("📤 **Upload New File**", key="show_uploader", use_container_width=True):
+            st.session_state.show_admin_uploader = True
+
+def render_file_management():
+    """Render file management interface."""
+    st.markdown("### 📁 File Management")
+
+    # Volume statistics (moved from legacy)
+    render_volume_stats_inline()
+
+    # Show upload interface if requested
+    if st.session_state.get('show_admin_uploader', False):
+        render_admin_file_uploader()
+
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("❌ Cancel Upload"):
+                st.session_state.show_admin_uploader = False
                 st.rerun()
+
+    # File browser
+    render_file_browser()
+
+def render_volume_stats_inline():
+    """Render volume statistics inline."""
+    volume_path = "/data"
+    local_path = "./data"
+
+    # Check both paths
+    paths_to_check = [
+        ("/data", "Production Volume"),
+        ("./data", "Local Directory")
+    ]
+
+    for path, label in paths_to_check:
+        if os.path.exists(path):
+            try:
+                files = get_files_from_directory(path, label)
+                if files:
+                    total_size = sum(f['size'] for f in files)
+                    parquet_files = [f for f in files if f['is_parquet']]
+
+                    with st.expander(f"📊 {label} Stats", expanded=False):
+                        col1, col2, col3 = st.columns(3)
+                        col1.metric("Total Files", len(files))
+                        col2.metric("Parquet Files", len(parquet_files))
+                        col3.metric("Total Size", f"{round(total_size / (1024*1024), 1)} MB")
+            except Exception:
+                pass
+
+def display_admin_loading_results(results: dict):
+    """Display loading results for admin interface."""
+    # Currency and method info
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("Currency Detected", results['currency'].upper())
+
+    with col2:
+        method_display = {
+            'auto_volume': 'Auto-Loaded',
+            'upload': 'Uploaded',
+            'manual': 'Manual'
+        }
+        loading_method = method_display.get(results['loading_method'], 'Unknown')
+        if results.get('data_source_path'):
+            source_type = "Volume" if results['data_source_path'] == "/data" else "Local"
+            loading_method = f"{loading_method} ({source_type})"
+        st.metric("Loading Method", loading_method)
+
+    with col3:
+        total_records = sum(len(df) for df in results['processed_data'].values())
+        st.metric("Total Records", f"{total_records:,}")
+
+    # Record type breakdown
+    if results['processed_data']:
+        st.markdown("#### 📊 Data Summary")
+
+        for record_type, df in results['processed_data'].items():
+            validation = results['validation_results'].get(record_type, {})
+
+            with st.expander(f"📋 {record_type.replace('_', ' ').title()} ({len(df):,} records)", expanded=True):
+                # Validation status
+                if validation.get('is_valid', False):
+                    st.success("✅ Schema validation passed")
+                else:
+                    st.warning("⚠️ Schema validation had issues")
+
+                # Quick stats
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Records", f"{len(df):,}")
+                with col2:
+                    if 'person_name' in df.columns:
+                        st.metric("People", df['person_name'].nunique())
+                with col3:
+                    if 'project_number' in df.columns:
+                        st.metric("Projects", df['project_number'].nunique())
+
+def render_admin_file_uploader():
+    """Render admin file upload interface."""
+    from utils.unified_data_loader import load_data_from_upload
+
+    st.markdown("#### 📤 Upload Data File")
+
+    uploaded_file = st.file_uploader(
+        "Choose a parquet file",
+        type=['parquet', 'pq'],
+        help="Upload a .parquet file with time tracking and/or planned hours data",
+        key="admin_file_upload"
+    )
+
+    if uploaded_file is not None:
+        st.info(f"📁 **File selected**: `{uploaded_file.name}` ({round(len(uploaded_file.getvalue()) / (1024*1024), 2)} MB)")
+
+        if st.button("🚀 Process File", type="primary", key="admin_process_file"):
+            with st.spinner("Processing file..."):
+                loading_results = load_data_from_upload(uploaded_file, show_debug=True)
+
+            if loading_results['success']:
+                st.success("🎉 **File processed successfully!**")
+                # Display loading results inline instead of importing
+                display_admin_loading_results(loading_results)
+                st.session_state.show_admin_uploader = False
             else:
-                st.error("Invalid password")
+                st.error(f"❌ **File processing failed**: {loading_results.get('error', 'Unknown error')}")
+
+def render_file_browser():
+    """Render file browser for both local and volume directories."""
+    st.markdown("#### 📂 Available Files")
+
+    # Check both directories
+    local_files = get_files_from_directory("./data", "Local Directory (./data)")
+    volume_files = get_files_from_directory("/data", "Production Volume (/data)")
+
+    if local_files:
+        render_file_list(local_files, "Local Directory (./data)")
+
+    if volume_files:
+        render_file_list(volume_files, "Production Volume (/data)")
+
+    if not local_files and not volume_files:
+        st.info("📂 No data files found in either local directory or production volume.")
+
+def get_files_from_directory(directory_path: str, display_name: str):
+    """Get files from a specific directory."""
+    if not os.path.exists(directory_path):
+        return []
+
+    files = []
+    try:
+        for filename in os.listdir(directory_path):
+            file_path = os.path.join(directory_path, filename)
+            if os.path.isfile(file_path):
+                stat = os.stat(file_path)
+                files.append({
+                    'filename': filename,
+                    'path': file_path,
+                    'size': stat.st_size,
+                    'size_mb': round(stat.st_size / (1024 * 1024), 2),
+                    'modified': datetime.fromtimestamp(stat.st_mtime),
+                    'is_parquet': filename.lower().endswith(('.parquet', '.pq')),
+                    'directory': display_name
+                })
+    except Exception as e:
+        st.error(f"Error accessing {display_name}: {e}")
+
+    return sorted(files, key=lambda x: x['modified'], reverse=True)
+
+def render_file_list(files, directory_name):
+    """Render a list of files."""
+    st.markdown(f"##### {directory_name}")
+
+    for i, file_info in enumerate(files):
+        with st.expander(f"{'📊' if file_info['is_parquet'] else '📄'} {file_info['filename']}", expanded=False):
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.write(f"**Size**: {file_info['size_mb']} MB")
+                st.write(f"**Modified**: {file_info['modified'].strftime('%Y-%m-%d %H:%M:%S')}")
+
+            with col2:
+                st.write(f"**Type**: {'Parquet Data File' if file_info['is_parquet'] else 'Other'}")
+                st.write(f"**Path**: `{file_info['path']}`")
 
 def get_volume_files():
     """Get list of files in /data volume with metadata"""
@@ -363,7 +591,34 @@ def render_admin_interface():
         render_debug_interface()
 
 # Main admin page logic
-if check_admin_access():
-    render_admin_interface()
-else:
-    render_admin_login()
+st.title("🛠️ Admin Panel")
+
+if require_admin_access():
+    # Show logout button
+    render_admin_logout()
+
+    # Show data management section
+    render_data_management_section()
+
+    # Client access link
+    render_client_access()
+
+    st.markdown("---")
+
+    # Additional tools (simplified legacy)
+    with st.expander("🔧 **Additional Tools**", expanded=False):
+        render_debug_interface()
+
+def render_client_access():
+    """Render client access information."""
+    st.markdown("## 🔗 Client Access")
+    st.markdown("Share this URL with clients for dashboard access:")
+
+    # Try to get current URL, fallback to placeholder
+    try:
+        # This will work in most deployments
+        client_url = "https://your-app-url.com"  # Replace with actual deployment URL
+        st.code(client_url, language=None)
+        st.info("💡 **Tip**: Remove '/Admin' from the browser URL to get the client dashboard link")
+    except Exception:
+        st.info("💡 **Client URL**: Remove '/Admin' from the current browser URL")

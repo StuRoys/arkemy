@@ -144,7 +144,7 @@ def render_dashboard():
         else:
             # Projects sub-navigation using nested tabs
             details_tab, types_tab, pricing_tab, activity_tab, phases_tab = st.tabs(
-                ["Project details", "Project types", "Price models", "Activity types", "Project Phases"]
+                ["Project details", "Typologies", "Price models", "Activities", "Phases"]
             )
             
             with details_tab:

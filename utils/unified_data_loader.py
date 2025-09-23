@@ -130,13 +130,14 @@ class UnifiedDataLoader:
 
         return transformed_df, validation_results
 
-    def load_unified_data(self, file_path: str, show_debug: bool = False) -> Dict[str, Any]:
+    def load_unified_data(self, file_path: str, show_debug: bool = False, silent_mode: bool = False) -> Dict[str, Any]:
         """
         Main function to load and process unified parquet data.
 
         Args:
             file_path: Path to parquet file
             show_debug: Whether to show debug information
+            silent_mode: Whether to suppress user-facing messages
 
         Returns:
             Loading results dictionary
@@ -173,7 +174,8 @@ class UnifiedDataLoader:
             # Process data based on analysis
             if analysis['loading_strategy'] == 'multi_type':
                 # Multi-record-type file
-                st.info(f"🔍 Detected unified file with {len(analysis['record_types'])} record types")
+                if not silent_mode:
+                    st.info(f"🔍 Detected unified file with {len(analysis['record_types'])} record types")
 
                 for record_type in analysis['record_types']:
                     if record_type in self.schema_manager.get_record_types():
@@ -182,8 +184,9 @@ class UnifiedDataLoader:
                         results['processed_data'][record_type] = processed_df
                         results['validation_results'][record_type] = validation_results
 
-                        # Display validation results
-                        self.schema_manager.display_validation_results(validation_results, record_type)
+                        # Display validation results (only if not in silent mode)
+                        if not silent_mode:
+                            self.schema_manager.display_validation_results(validation_results, record_type)
 
                         # Store in session state
                         session_target = self.schema_manager.get_session_state_target(record_type)
@@ -195,20 +198,22 @@ class UnifiedDataLoader:
                         elif record_type == 'planned_record':
                             st.session_state.planned_csv_loaded = True
 
-                        if show_debug:
+                        if show_debug and not silent_mode:
                             st.success(f"✅ Processed {record_type}: {len(processed_df)} records → `session_state.{session_target}`")
 
             else:
                 # Single-record-type file (fallback to default)
                 default_type = self.schema_manager.schema.get('settings', {}).get('default_record_type', 'time_record')
-                st.info(f"📁 Processing as single-type file (assumed: {default_type})")
+                if not silent_mode:
+                    st.info(f"📁 Processing as single-type file (assumed: {default_type})")
 
                 processed_df, validation_results = self.process_record_type(df, default_type)
                 results['processed_data'][default_type] = processed_df
                 results['validation_results'][default_type] = validation_results
 
-                # Display validation results
-                self.schema_manager.display_validation_results(validation_results, default_type)
+                # Display validation results (only if not in silent mode)
+                if not silent_mode:
+                    self.schema_manager.display_validation_results(validation_results, default_type)
 
                 # Store in session state
                 session_target = self.schema_manager.get_session_state_target(default_type)
@@ -256,58 +261,72 @@ class UnifiedDataLoader:
                 st.write(f"• **{record_type}**: {config.get('description', 'No description')}")
                 st.write(f"  - Required fields: {required_count}, Optional fields: {optional_count}")
 
-def scan_volume_for_parquet_files(volume_path: str = "/data") -> List[Dict[str, Any]]:
+def scan_volume_for_parquet_files(volume_paths: List[str] = None) -> Tuple[List[Dict[str, Any]], str]:
     """
-    Scan volume directory for parquet files with metadata.
+    Scan volume directories for parquet files with metadata.
 
     Args:
-        volume_path: Path to volume directory
+        volume_paths: List of paths to scan (defaults to ["/data", "./data"])
 
     Returns:
-        List of file info dictionaries
+        Tuple of (file info list, successful path used)
     """
-    files_info = []
+    if volume_paths is None:
+        volume_paths = ["/data", "./data"]
 
-    if not os.path.exists(volume_path):
-        return files_info
+    for volume_path in volume_paths:
+        files_info = []
 
-    try:
-        for filename in os.listdir(volume_path):
-            file_path = os.path.join(volume_path, filename)
-            if os.path.isfile(file_path) and filename.lower().endswith(('.parquet', '.pq')):
-                stat = os.stat(file_path)
-                files_info.append({
-                    'filename': filename,
-                    'path': file_path,
-                    'size': stat.st_size,
-                    'modified': stat.st_mtime,
-                    'size_mb': round(stat.st_size / (1024 * 1024), 2),
-                })
+        if not os.path.exists(volume_path):
+            continue
 
-        # Sort by modification time (newest first)
-        files_info.sort(key=lambda x: x['modified'], reverse=True)
+        try:
+            for filename in os.listdir(volume_path):
+                file_path = os.path.join(volume_path, filename)
+                if os.path.isfile(file_path) and filename.lower().endswith(('.parquet', '.pq')):
+                    stat = os.stat(file_path)
+                    files_info.append({
+                        'filename': filename,
+                        'path': file_path,
+                        'size': stat.st_size,
+                        'modified': stat.st_mtime,
+                        'size_mb': round(stat.st_size / (1024 * 1024), 2),
+                        'source_path': volume_path,
+                    })
 
-    except Exception as e:
-        logger.error(f"Error scanning volume {volume_path}: {e}")
+            if files_info:
+                # Sort by modification time (newest first)
+                files_info.sort(key=lambda x: x['modified'], reverse=True)
+                logger.info(f"Found {len(files_info)} parquet file(s) in {volume_path}")
+                return files_info, volume_path
 
-    return files_info
+        except Exception as e:
+            logger.error(f"Error scanning volume {volume_path}: {e}")
+            continue
 
-def load_data_hybrid(volume_path: str = "/data", show_debug: bool = False) -> Dict[str, Any]:
+    return [], ""
+
+def load_data_hybrid(volume_paths: List[str] = None, show_debug: bool = False, silent_mode: bool = False) -> Dict[str, Any]:
     """
-    Hybrid data loading: check volume first, then allow manual upload.
+    Hybrid data loading: check volume paths first, then allow manual upload.
 
     Args:
-        volume_path: Path to volume directory to scan
+        volume_paths: List of paths to scan (defaults to ["/data", "./data"])
         show_debug: Whether to show debug information
+        silent_mode: Whether to suppress user-facing messages
 
     Returns:
         Loading results dictionary with volume_files info
     """
+    if volume_paths is None:
+        volume_paths = ["/data", "./data"]
+
     results = {
         'success': False,
         'loading_method': 'none',
         'volume_files': [],
         'auto_loaded_file': None,
+        'data_source_path': '',
         'currency': 'nok',
         'analysis': {},
         'processed_data': {},
@@ -315,9 +334,10 @@ def load_data_hybrid(volume_path: str = "/data", show_debug: bool = False) -> Di
         'error': None
     }
 
-    # Scan volume for parquet files
-    volume_files = scan_volume_for_parquet_files(volume_path)
+    # Scan volume paths for parquet files
+    volume_files, successful_path = scan_volume_for_parquet_files(volume_paths)
     results['volume_files'] = volume_files
+    results['data_source_path'] = successful_path
 
     if volume_files:
         # Auto-load the newest file
@@ -325,20 +345,23 @@ def load_data_hybrid(volume_path: str = "/data", show_debug: bool = False) -> Di
         results['loading_method'] = 'auto_volume'
         results['auto_loaded_file'] = newest_file
 
-        st.info(f"🔍 **Auto-Loading Data**: Found {len(volume_files)} parquet file(s) in volume")
-        st.info(f"📁 **Loading**: `{newest_file['filename']}` ({newest_file['size_mb']} MB)")
+        # Display source information (only if not in silent mode)
+        if not silent_mode:
+            source_type = "production volume" if successful_path == "/data" else "local directory"
+            st.info(f"🔍 **Auto-Loading Data**: Found {len(volume_files)} parquet file(s) in {source_type} (`{successful_path}`)")
+            st.info(f"📁 **Loading**: `{newest_file['filename']}` ({newest_file['size_mb']} MB)")
 
-        if len(volume_files) > 1:
-            with st.expander(f"ℹ️ Other files available ({len(volume_files)-1})"):
-                for file_info in volume_files[1:]:
-                    st.write(f"• `{file_info['filename']}` ({file_info['size_mb']} MB)")
+            if len(volume_files) > 1:
+                with st.expander(f"ℹ️ Other files available ({len(volume_files)-1})"):
+                    for file_info in volume_files[1:]:
+                        st.write(f"• `{file_info['filename']}` ({file_info['size_mb']} MB)")
 
         # Load the file using unified loader
         loader = UnifiedDataLoader()
-        if show_debug:
+        if show_debug and not silent_mode:
             loader.get_schema_info()
 
-        load_results = loader.load_unified_data(newest_file['path'], show_debug)
+        load_results = loader.load_unified_data(newest_file['path'], show_debug, silent_mode)
 
         # Merge results
         results.update(load_results)
@@ -346,7 +369,9 @@ def load_data_hybrid(volume_path: str = "/data", show_debug: bool = False) -> Di
 
     else:
         results['loading_method'] = 'upload_required'
-        st.info("📂 **No parquet files found in volume**. Please upload your data file below.")
+        if not silent_mode:
+            attempted_paths = ", ".join([f"`{path}`" for path in volume_paths])
+            st.info(f"📂 **No parquet files found** in {attempted_paths}. Please upload your data file below.")
 
     return results
 

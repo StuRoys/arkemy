@@ -27,41 +27,53 @@ if 'currency' not in st.session_state:
     st.session_state.currency = 'nok'
 
 def render_data_loading_interface():
-    """Render the new hybrid data loading interface."""
+    """Render the clean data loading interface for users."""
     from utils.unified_data_loader import load_data_hybrid, load_data_from_upload
-
-    st.title("📊 Arkemy Analytics Dashboard")
-    st.markdown("**Professional project analytics powered by schema-driven data processing**")
+    from utils.admin_helpers import is_admin_authenticated
 
     # Check if data is already loaded
     if st.session_state.csv_loaded and st.session_state.transformed_df is not None:
-        render_data_loaded_status()
-        return True
+        # For regular users: no status messages, just proceed to dashboard
+        if not is_admin_authenticated():
+            return True
+        else:
+            # For admins: show minimal status in sidebar or expander
+            render_admin_data_status()
+            return True
 
-    st.markdown("---")
-    st.subheader("🔄 Data Loading")
-
-    # Get debug mode status
+    # Try to load data silently for regular users
     debug_mode = is_debug_mode()
+    is_admin = is_admin_authenticated()
 
-    if debug_mode:
-        st.info("🐛 **Debug Mode Enabled** - Detailed validation information will be shown")
-
-    # Try hybrid loading (check volume first)
-    loading_results = load_data_hybrid(show_debug=debug_mode)
+    # Silent loading for regular users, verbose for admins
+    loading_results = load_data_hybrid(
+        volume_paths=["/data", "./data"],
+        show_debug=debug_mode and is_admin,
+        silent_mode=not is_admin
+    )
 
     if loading_results['loading_method'] == 'auto_volume':
         # Data was auto-loaded from volume
         if loading_results['success']:
-            st.success("🎉 **Data loaded successfully from volume!**")
-            display_loading_results(loading_results)
+            if is_admin:
+                st.success("🎉 **Data loaded successfully!**")
+                display_loading_results(loading_results)
             return True
         else:
-            st.error(f"❌ **Auto-loading failed**: {loading_results.get('error', 'Unknown error')}")
+            if is_admin:
+                st.error(f"❌ **Auto-loading failed**: {loading_results.get('error', 'Unknown error')}")
+            else:
+                st.error("Unable to load data. Please contact administrator.")
 
     elif loading_results['loading_method'] == 'upload_required':
-        # No files in volume, show upload interface
-        return render_upload_interface(debug_mode)
+        # No files found
+        if is_admin:
+            # Show upload interface to admins
+            return render_upload_interface(debug_mode)
+        else:
+            # Show simple message to users
+            st.info("📂 **No data available**. Please contact your administrator to upload data files.")
+            return False
 
     return False
 
@@ -110,7 +122,11 @@ def display_loading_results(results: dict):
             'upload': 'Uploaded',
             'manual': 'Manual'
         }
-        st.metric("Loading Method", method_display.get(results['loading_method'], 'Unknown'))
+        loading_method = method_display.get(results['loading_method'], 'Unknown')
+        if results.get('data_source_path'):
+            source_type = "Volume" if results['data_source_path'] == "/data" else "Local"
+            loading_method = f"{loading_method} ({source_type})"
+        st.metric("Loading Method", loading_method)
 
     with col3:
         total_records = sum(len(df) for df in results['processed_data'].values())
@@ -156,38 +172,41 @@ def display_loading_results(results: dict):
                     if available_cols:
                         st.dataframe(df[available_cols].head(), use_container_width=True)
 
+def render_admin_data_status():
+    """Show minimal data status for admins."""
+    with st.expander("🔧 **Admin: Data Status**", expanded=False):
+        # Quick stats
+        df = st.session_state.transformed_df
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric("Total Records", f"{len(df):,}")
+        with col2:
+            st.metric("People", df['person_name'].nunique() if 'person_name' in df.columns else 'N/A')
+        with col3:
+            st.metric("Projects", df['project_number'].nunique() if 'project_number' in df.columns else 'N/A')
+        with col4:
+            st.metric("Currency", st.session_state.currency.upper())
+
+        # Show planned data status if available
+        if st.session_state.get('planned_csv_loaded', False) and st.session_state.transformed_planned_df is not None:
+            planned_df = st.session_state.transformed_planned_df
+            st.info(f"📅 **Planned data also loaded**: {len(planned_df):,} planned records")
+
+        # Option to reload data
+        col1, col2 = st.columns([3, 1])
+        with col2:
+            if st.button("🔄 Reload Data", key="admin_reload"):
+                # Clear session state to trigger reload
+                st.session_state.csv_loaded = False
+                st.session_state.transformed_df = None
+                st.session_state.planned_csv_loaded = False
+                st.session_state.transformed_planned_df = None
+                st.rerun()
+
 def render_data_loaded_status():
-    """Show status when data is already loaded."""
-    st.success("✅ **Data is loaded and ready for analysis!**")
-
-    # Quick stats
-    df = st.session_state.transformed_df
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        st.metric("Total Records", f"{len(df):,}")
-    with col2:
-        st.metric("People", df['person_name'].nunique() if 'person_name' in df.columns else 'N/A')
-    with col3:
-        st.metric("Projects", df['project_number'].nunique() if 'project_number' in df.columns else 'N/A')
-    with col4:
-        st.metric("Currency", st.session_state.currency.upper())
-
-    # Show planned data status if available
-    if st.session_state.get('planned_csv_loaded', False) and st.session_state.transformed_planned_df is not None:
-        planned_df = st.session_state.transformed_planned_df
-        st.info(f"📅 **Planned data also loaded**: {len(planned_df):,} planned records")
-
-    # Option to reload data
-    col1, col2 = st.columns([3, 1])
-    with col2:
-        if st.button("🔄 Reload Data"):
-            # Clear session state to trigger reload
-            st.session_state.csv_loaded = False
-            st.session_state.transformed_df = None
-            st.session_state.planned_csv_loaded = False
-            st.session_state.transformed_planned_df = None
-            st.rerun()
+    """Legacy function - now redirects to admin status."""
+    render_admin_data_status()
 
 def main():
     """Main page logic."""
@@ -196,8 +215,6 @@ def main():
     data_loaded = render_data_loading_interface()
 
     if data_loaded and st.session_state.csv_loaded:
-        st.markdown("---")
-
         # Import and render the main dashboard
         try:
             from ui.dashboard import render_dashboard
