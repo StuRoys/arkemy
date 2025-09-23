@@ -127,11 +127,11 @@ def create_treemap(data_df, path_col, values_col, color_scheme="Blues", unit_tex
     
     # Update hover template and styling
     if use_thousand_sep:
-        # With thousand separators - no decimals (use space as thousand separator)
-        hover_template = f"<b style='font-size:18px'>%{{label}}</b><br><span style='font-size:18px'>{values_col}: %{{value:_.0f}} {unit_text}</span>"
-        hover_template = hover_template.replace("_", " ")
-        text_template = '%{label}<br>%{value:_.0f} ' + unit_text
-        text_template = text_template.replace("_", " ")
+        # With thousand separators - no decimals (use comma then replace with space)
+        hover_template = f"<b style='font-size:18px'>%{{label}}</b><br><span style='font-size:18px'>{values_col}: %{{value:,.0f}} {unit_text}</span>"
+        hover_template = hover_template.replace(",", " ")
+        text_template = '%{label}<br>%{value:,.0f} ' + unit_text
+        text_template = text_template.replace(",", " ")
     else:
         # Without thousand separators - 1 decimal for hours, 0 for rates
         hover_template = f"<b style='font-size:18px'>%{{label}}</b><br><span style='font-size:18px'>{values_col}: %{{value:.0f}} {unit_text}</span>"
