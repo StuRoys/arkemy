@@ -83,10 +83,10 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
             }).reset_index()
 
             # Build treemap data structure with proper ids, labels, parents, values
-            ids = ["ROOT"]
-            labels = ["Total"]
-            parents = [""]
-            values = [0]  # Will be calculated from children
+            ids = []
+            labels = []
+            parents = []
+            values = []
 
             # Track which customer groups we've added
             group_totals = {}
@@ -104,7 +104,7 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                     group_ids[group] = group_id
                     ids.append(group_id)
                     labels.append(str(group))
-                    parents.append("ROOT")
+                    parents.append("")  # Empty parent = root level
                     group_totals[group] = 0
                     values.append(0)  # Will be filled in with children sum
 
@@ -123,9 +123,6 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                     if group_name in group_totals:
                         values[i] = group_totals[group_name]
 
-            # Update root value
-            values[0] = sum(group_totals.values())
-
             # Build color values (for continuous color scale)
             color_values = values.copy()
 
@@ -142,7 +139,7 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                     line=dict(width=1)
                 ),
                 textposition="middle center",
-                maxdepth=2  # Show customer groups at first, then customers on click
+                maxdepth=1  # Show only customer groups at first, click to drill into customers
             )])
 
             fig.update_layout(
