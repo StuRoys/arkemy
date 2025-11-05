@@ -318,6 +318,75 @@ def aggregate_by_customer(df: pd.DataFrame) -> pd.DataFrame:
     return customer_agg
 
 
+def aggregate_by_customer_group(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aggregate data by customer group.
+
+    Args:
+        df: Validated and transformed dataframe
+
+    Returns:
+        Dataframe with customer group aggregations
+    """
+    # Check if customer_group column exists
+    if "customer_group" not in df.columns:
+        # If customer_group doesn't exist, return empty dataframe with expected columns
+        return pd.DataFrame()
+
+    customer_group_agg = df.groupby("customer_group").agg({
+        "hours_used": "sum",
+        "hours_billable": "sum",
+        "project_number": "nunique"
+    }).reset_index()
+
+    customer_group_agg["Non-billable hours"] = customer_group_agg["hours_used"] - customer_group_agg["hours_billable"]
+    customer_group_agg["Billability %"] = (customer_group_agg["hours_billable"] / customer_group_agg["hours_used"] * 100).round(2)
+    customer_group_agg.rename(columns={"project_number": "Number of projects"}, inplace=True)
+
+    # Add fee (new approach with fallback)
+    if "fee_record" in df.columns:
+        fee_by_group = df.groupby("customer_group")["fee_record"].sum().reset_index(name="Fee")
+        customer_group_agg = pd.merge(customer_group_agg, fee_by_group, on="customer_group")
+    elif "billable_rate_record" in df.columns:
+        # Fallback to old calculation
+        fee_by_group = df.groupby("customer_group").apply(
+            lambda x: (x["hours_billable"] * x["billable_rate_record"]).sum()
+        ).reset_index(name="Fee")
+        customer_group_agg = pd.merge(customer_group_agg, fee_by_group, on="customer_group")
+    else:
+        customer_group_agg["Fee"] = 0
+
+    # Add cost
+    if "cost_record" in df.columns:
+        cost_by_group = df.groupby("customer_group")["cost_record"].sum().reset_index(name="Total cost")
+        customer_group_agg = pd.merge(customer_group_agg, cost_by_group, on="customer_group")
+    else:
+        customer_group_agg["Total cost"] = 0
+
+    # Add profit
+    if "profit_record" in df.columns:
+        profit_by_group = df.groupby("customer_group")["profit_record"].sum().reset_index(name="Total profit")
+        customer_group_agg = pd.merge(customer_group_agg, profit_by_group, on="customer_group")
+    else:
+        customer_group_agg["Total profit"] = 0
+
+    # Calculate rates
+    customer_group_agg["Billable rate"] = 0  # Default
+    mask = customer_group_agg["hours_billable"] > 0
+    customer_group_agg.loc[mask, "Billable rate"] = customer_group_agg.loc[mask, "Fee"] / customer_group_agg.loc[mask, "hours_billable"]
+
+    customer_group_agg["Effective rate"] = 0  # Default
+    mask = customer_group_agg["hours_used"] > 0
+    customer_group_agg.loc[mask, "Effective rate"] = customer_group_agg.loc[mask, "Fee"] / customer_group_agg.loc[mask, "hours_used"]
+
+    # Calculate profit margin
+    customer_group_agg["Profit margin %"] = 0.0
+    mask = customer_group_agg["Fee"] > 0
+    customer_group_agg.loc[mask, "Profit margin %"] = (customer_group_agg.loc[mask, "Total profit"] / customer_group_agg.loc[mask, "Fee"] * 100).round(2)
+
+    return customer_group_agg
+
+
 def aggregate_by_project(df: pd.DataFrame) -> pd.DataFrame:
     """
     Aggregate data by project.

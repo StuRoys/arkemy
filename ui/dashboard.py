@@ -5,6 +5,7 @@ from charts.summary_kpis import display_summary_metrics
 from charts.summary_charts import render_summary_tab
 from charts.year_charts import render_year_tab, render_monthly_trends_chart
 from charts.customer_charts import render_customer_tab
+from charts.customer_group_charts import render_customer_group_tab
 from charts.project_type_charts import render_project_type_tab
 from charts.project_charts import render_project_tab
 from charts.phase_charts import render_phase_tab
@@ -16,6 +17,7 @@ from utils.processors import (
     aggregate_by_year,
     aggregate_by_month_year,
     aggregate_by_customer,
+    aggregate_by_customer_group,
     aggregate_by_project,
     aggregate_by_project_type,
     aggregate_by_phase,
@@ -207,9 +209,21 @@ def render_dashboard():
         if not has_data:
             st.warning("No data in selected range")
         else:
-            render_customer_tab(
-                filtered_df=filtered_df,
-                aggregate_by_customer=aggregate_by_customer,
-                render_chart=render_chart,
-                get_category_colors=get_category_colors
-            )
+            # Clients sub-navigation using nested tabs
+            customer_groups_tab, customers_tab = st.tabs(["Customer Groups", "Customers"])
+
+            with customer_groups_tab:
+                render_customer_group_tab(
+                    filtered_df=filtered_df,
+                    aggregate_by_customer_group=aggregate_by_customer_group,
+                    render_chart=render_chart,
+                    get_category_colors=get_category_colors
+                )
+
+            with customers_tab:
+                render_customer_tab(
+                    filtered_df=filtered_df,
+                    aggregate_by_customer=aggregate_by_customer,
+                    render_chart=render_chart,
+                    get_category_colors=get_category_colors
+                )
