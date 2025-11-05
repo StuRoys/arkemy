@@ -82,50 +82,74 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                 metric_column: "sum" if metric_column in ["hours_used", "hours_billable", "Fee", "Total cost", "Total profit"] else "first"
             }).reset_index()
 
-            # Calculate group totals for second level aggregation
-            group_totals = customer_level_data.groupby("customer_group")[metric_column].sum().reset_index()
-            group_totals.columns = ["customer_group", f"{metric_column}_total"]
+            # Build treemap data structure with proper ids, labels, parents, values
+            ids = ["ROOT"]
+            labels = ["Total"]
+            parents = [""]
+            values = [0]  # Will be calculated from children
 
-            # Merge to get both customer and group level values
-            customer_level_data = customer_level_data.merge(group_totals, on="customer_group")
+            # Track which customer groups we've added
+            group_totals = {}
+            group_ids = {}
 
-            # Build treemap data structure: root -> customer_groups -> customers
-            labels = ["Total"] + group_totals["customer_group"].tolist() + customer_level_data["customer_name"].tolist()
-            parents = [""] + ["Total"] * len(group_totals) + customer_level_data["customer_group"].tolist()
+            # First pass: add all customer groups and their customers
+            for _, row in customer_level_data.iterrows():
+                group = row["customer_group"]
+                customer = row["customer_name"]
+                metric_value = row[metric_column]
 
-            # Build values list
-            root_value = customer_level_data[metric_column].sum()
-            group_values = group_totals[f"{metric_column}_total"].tolist()
-            customer_values = customer_level_data[metric_column].tolist()
-            values = [root_value] + group_values + customer_values
+                # Add customer group if not already added
+                if group not in group_ids:
+                    group_id = f"group_{group}"
+                    group_ids[group] = group_id
+                    ids.append(group_id)
+                    labels.append(str(group))
+                    parents.append("ROOT")
+                    group_totals[group] = 0
+                    values.append(0)  # Will be filled in with children sum
 
-            # Build color values (use metric column for continuous color scale)
-            root_color = root_value
-            group_colors = group_totals[f"{metric_column}_total"].tolist()
-            customer_colors = customer_level_data[metric_column].tolist()
-            color_values = [root_color] + group_colors + customer_colors
+                # Add customer under group
+                customer_id = f"customer_{group}_{customer}"
+                ids.append(customer_id)
+                labels.append(str(customer))
+                parents.append(group_ids[group])
+                values.append(metric_value)
+                group_totals[group] += metric_value
+
+            # Update group totals in values list
+            for i, id_ in enumerate(ids):
+                if id_.startswith("group_"):
+                    group_name = id_.replace("group_", "")
+                    if group_name in group_totals:
+                        values[i] = group_totals[group_name]
+
+            # Update root value
+            values[0] = sum(group_totals.values())
+
+            # Build color values (for continuous color scale)
+            color_values = values.copy()
 
             # Create hierarchical treemap using graph_objects
-            fig = go.Figure(go.Treemap(
+            fig = go.Figure(data=[go.Treemap(
+                ids=ids,
                 labels=labels,
                 parents=parents,
                 values=values,
                 marker=dict(
                     colors=color_values,
                     colorscale="Blues",
-                    cmid=None
+                    cmid=None,
+                    line=dict(width=1)
                 ),
-                marker_colorbar=dict(title=selected_metric),
-                textposition="middle center"
-            ))
+                textposition="middle center",
+                maxdepth=2  # Show customer groups at first, then customers on click
+            )])
 
             fig.update_layout(
                 title=f"Customer Group {selected_metric} Distribution",
-                height=600
+                height=600,
+                margin=dict(l=0, r=0, t=40, b=0)
             )
-
-            # Set maxdepth to show only customer groups at first (depth 1)
-            fig.update_traces(maxdepth=1)
 
             render_chart(fig, "customer_group")
 
