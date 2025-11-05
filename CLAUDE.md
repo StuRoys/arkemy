@@ -83,6 +83,29 @@ Before ANY Railway deployment:
 - **Avoid phrases like "Perfect!", "Great!", "🚀" or similar excitement**
 - **Focus on technical facts and what was accomplished**
 
+## Feature Development Protocol
+**CRITICAL: DO NOT claim features are "solved" or "complete" without explicit user confirmation**
+
+### Workflow for Feature Work
+1. **Implement changes** - Write code, test locally, commit
+2. **Report status** - Describe what was done, show the app is running
+3. **WAIT for user feedback** - Do NOT assume it's working
+4. **User tests and confirms** - They verify the feature works as intended
+5. **ONLY THEN** - Mark as complete or move to next iteration
+
+### What Counts as Confirmation
+- User explicitly says "looks good", "works", "this is right", "ship it", etc.
+- User asks for specific changes (implies they tested)
+- Silence from user = **NOT confirmation** - ask what they think
+
+### What Does NOT Count as Confirmation
+- App starts without errors
+- Code compiles/imports
+- Local testing shows no crashes
+- "I think it should work"
+
+**Remember**: Just because the feature runs doesn't mean it solves the problem. Wait for the user to tell you.
+
 ## Common Development Commands
 
 **Run the application:**
