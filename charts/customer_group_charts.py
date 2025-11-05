@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from utils.chart_helpers import create_standardized_customdata
 from utils.chart_styles import get_metric_options
 
@@ -75,16 +76,57 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
     # Render visualization based on type
     if not filtered_group_agg.empty:
         if visualization_type == "Treemap":
-            # Customer group treemap - using filtered data with standardized custom data
-            fig = px.treemap(
-                filtered_group_agg,
-                path=["customer_group"],
-                values=metric_column,
-                color=metric_column,
-                color_continuous_scale="Blues",
-                custom_data=create_standardized_customdata(filtered_group_agg),
-                title=f"Customer Group {selected_metric} Distribution"
+            # Create hierarchical treemap with customer groups and underlying customers
+            # Group by both customer_group and customer_name to build hierarchy
+            customer_level_data = filtered_df.groupby(["customer_group", "customer_name"]).agg({
+                metric_column: "sum" if metric_column in ["hours_used", "hours_billable", "Fee", "Total cost", "Total profit"] else "first"
+            }).reset_index()
+
+            # Calculate group totals for second level aggregation
+            group_totals = customer_level_data.groupby("customer_group")[metric_column].sum().reset_index()
+            group_totals.columns = ["customer_group", f"{metric_column}_total"]
+
+            # Merge to get both customer and group level values
+            customer_level_data = customer_level_data.merge(group_totals, on="customer_group")
+
+            # Build treemap data structure: root -> customer_groups -> customers
+            labels = ["Total"] + group_totals["customer_group"].tolist() + customer_level_data["customer_name"].tolist()
+            parents = [""] + ["Total"] * len(group_totals) + customer_level_data["customer_group"].tolist()
+
+            # Build values list
+            root_value = customer_level_data[metric_column].sum()
+            group_values = group_totals[f"{metric_column}_total"].tolist()
+            customer_values = customer_level_data[metric_column].tolist()
+            values = [root_value] + group_values + customer_values
+
+            # Build color values (use metric column for continuous color scale)
+            root_color = root_value
+            group_colors = group_totals[f"{metric_column}_total"].tolist()
+            customer_colors = customer_level_data[metric_column].tolist()
+            color_values = [root_color] + group_colors + customer_colors
+
+            # Create hierarchical treemap using graph_objects
+            fig = go.Figure(go.Treemap(
+                labels=labels,
+                parents=parents,
+                values=values,
+                marker=dict(
+                    colors=color_values,
+                    colorscale="Blues",
+                    cmid=None
+                ),
+                marker_colorbar=dict(title=selected_metric),
+                textposition="middle center"
+            ))
+
+            fig.update_layout(
+                title=f"Customer Group {selected_metric} Distribution",
+                height=600
             )
+
+            # Set maxdepth to show only customer groups at first (depth 1)
+            fig.update_traces(maxdepth=1)
+
             render_chart(fig, "customer_group")
 
         elif visualization_type == "Bar chart":
