@@ -128,10 +128,37 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
             root_total = sum(group_totals.values())
             values[0] = root_total if root_total > 0 else 1  # Ensure it's not zero
 
-            # Build color values (for continuous color scale)
-            color_values = values.copy()
+            # Build discrete color assignment for better visual separation
+            # Assign colors: darker shades to customer groups, lighter to customers within
+            base_colors = px.colors.qualitative.Set2  # Soft, distinct colors
 
-            # Create hierarchical treemap using graph_objects
+            color_map = {}
+            unique_groups = list(group_totals.keys())
+
+            # Assign a base color to each customer group
+            for i, group in enumerate(unique_groups):
+                base_color = base_colors[i % len(base_colors)]
+                color_map[f"group_{group}"] = base_color
+
+            # Assign lighter shades to customers (derive from group color)
+            for id_ in ids:
+                if id_.startswith("customer_"):
+                    # Extract group from customer_id format: "customer_{group}_{customer}"
+                    parts = id_.split("_", 2)
+                    if len(parts) >= 2:
+                        group = parts[1]
+                        group_id = f"group_{group}"
+                        if group_id in color_map:
+                            color_map[id_] = color_map[group_id]  # Same color family
+
+            # ROOT gets neutral color
+            color_map["ROOT"] = "lightgray"
+
+            # Build colors list matching ids order
+            colors_list = [color_map.get(id_, "lightgray") for id_ in ids]
+
+            # Create hierarchical treemap using graph_objects with discrete colors
+            # Let apply_chart_style() handle marker styling (cornerradius, padding)
             fig = go.Figure(data=[go.Treemap(
                 ids=ids,
                 labels=labels,
@@ -139,22 +166,20 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                 values=values,
                 branchvalues="total",  # Calculate parent values from children
                 marker=dict(
-                    colors=color_values,
-                    colorscale="Blues",
-                    cmid=None,
-                    line=dict(width=1)
+                    colors=colors_list,  # Discrete colors per tile
+                    line=dict(width=2, color="white")  # White borders for separation
                 ),
                 textposition="middle center",
-                maxdepth=2,  # Show customer groups at depth 1, customers at depth 2 when drilling
-                pathbar=dict(visible=True)  # Show breadcrumb navigation
+                maxdepth=2  # Show customer groups at depth 1, customers at depth 2 when drilling
             )])
 
             fig.update_layout(
-                title=f"Customer Group {selected_metric} Distribution",
                 height=600,
-                margin=dict(l=0, r=0, t=40, b=0)
+                margin=dict(l=0, r=0, t=0, b=0)  # Remove top margin since no title
             )
 
+            # Note: Click events don't work reliably with go.Treemap in Streamlit
+            # The native drill-down functionality is available by clicking tiles
             render_chart(fig, "customer_group")
 
         elif visualization_type == "Bar chart":

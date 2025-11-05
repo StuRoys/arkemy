@@ -588,20 +588,20 @@ def apply_chart_style(fig, chart_type="default"):
 def render_chart(fig, chart_type="default"):
     """
     Apply styling and render a Plotly chart in Streamlit
-    
+
     Args:
         fig: Plotly figure object
         chart_type: Type of chart for specific styling
-    
+
     Returns:
         None (renders in Streamlit)
     """
     # Apply styling
     fig = apply_chart_style(fig, chart_type)
-    
+
     # Check if it's a comparison chart
     is_comparison, comparison_type = is_comparison_chart(fig)
-    
+
     # Apply custom hovertemplate based on chart type
     if fig.data and hasattr(fig.data[0], 'type'):
         # For comparison charts
@@ -617,7 +617,7 @@ def render_chart(fig, chart_type="default"):
         elif fig.data[0].type == 'bar' and not is_comparison:
             hovertemplate = create_barchart_hovertemplate(chart_type)
             fig.update_traces(hovertemplate=hovertemplate)
-    
+
     # Add CSS to improve chart display in Streamlit
     st.markdown(
         """
@@ -626,11 +626,27 @@ def render_chart(fig, chart_type="default"):
             width: 100%;
             margin: 0 auto;
         }
+        /* Hide treemap background element - target by gray fill color */
+        .treemaplayer .trace.treemap .slice .surface[style*="fill: rgb(68, 68, 68)"] {
+            pointer-events: none !important;
+            fill: transparent !important;
+            stroke: transparent !important;
+        }
+        /* Hide treemap background for go.Treemap (light gray) */
+        .treemaplayer .trace.treemap .slice .surface[style*="fill: rgb(211, 211, 211)"] {
+            pointer-events: none !important;
+            fill: transparent !important;
+            stroke: transparent !important;
+        }
+        /* Hide "undefined" text in treemap pathbar title */
+        text.gtitle[data-unformatted*="undefined"] {
+            display: none !important;
+        }
         </style>
-        """, 
+        """,
         unsafe_allow_html=True
     )
-    
+
     # Render the chart
     st.plotly_chart(fig, use_container_width=True)
 
