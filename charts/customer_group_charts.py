@@ -139,7 +139,7 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                     line=dict(width=1)
                 ),
                 textposition="middle center",
-                maxdepth=1  # Show only customer groups at first, click to drill into customers
+                maxdepth=2  # Show customer groups at depth 1, customers at depth 2 when drilling
             )])
 
             fig.update_layout(
