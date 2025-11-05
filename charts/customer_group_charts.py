@@ -124,8 +124,9 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                     if group_name in group_totals:
                         values[i] = group_totals[group_name]
 
-            # ROOT value stays 0 - branchvalues="total" will calculate from children
-            # This ensures customer groups fill entire treemap area without ROOT taking space
+            # Calculate ROOT value from all groups
+            root_total = sum(group_totals.values())
+            values[0] = root_total if root_total > 0 else 1  # Ensure it's not zero
 
             # Build color values (for continuous color scale)
             color_values = values.copy()

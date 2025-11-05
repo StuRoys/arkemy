@@ -83,6 +83,9 @@ Before ANY Railway deployment:
 - **Avoid phrases like "Perfect!", "Great!", "🚀" or similar excitement**
 - **Focus on technical facts and what was accomplished**
 
+## Technical References
+- **[plotly.md](plotly.md)** - Plotly visualization insights, especially treemap behavior and `branchvalues="total"` parameter requirements
+
 ## Feature Development Protocol
 **CRITICAL: DO NOT claim features are "solved" or "complete" without explicit user confirmation**
 
