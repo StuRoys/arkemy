@@ -12,6 +12,7 @@ from charts.phase_charts import render_phase_tab
 from charts.activity_charts import render_activity_tab
 from charts.people_charts import render_people_tab
 from charts.price_model_charts import render_price_model_tab
+from charts.company_comparison import render_comparison_tab
 
 from utils.processors import (
     aggregate_by_year,
@@ -108,21 +109,21 @@ def render_dashboard():
             st.warning("No data in selected range")
         else:
             # Company sub-navigation using nested tabs
-            kpis_tab, top10_tab, period_tab = st.tabs(["KPIs", "Top 10", "Period"])
-            
+            kpis_tab, top10_tab, period_tab, comparison_tab = st.tabs(["KPIs", "Top 10", "Period", "Comparison"])
+
             with kpis_tab:
                 display_summary_metrics(metrics)
-                
+
             with top10_tab:
                 render_summary_tab(
                     filtered_df=filtered_df,
                     filter_settings=filter_settings
                 )
-                
+
             with period_tab:
                 # Period sub-navigation using nested tabs
                 yearly_tab, monthly_tab = st.tabs(["Yearly View", "Monthly Trends"])
-                
+
                 with yearly_tab:
                     render_year_tab(
                         filtered_df=filtered_df,
@@ -130,7 +131,7 @@ def render_dashboard():
                         render_chart=render_chart,
                         get_category_colors=get_category_colors
                     )
-                
+
                 with monthly_tab:
                     render_monthly_trends_chart(
                         filtered_df=filtered_df,
@@ -138,6 +139,9 @@ def render_dashboard():
                         render_chart=render_chart,
                         get_category_colors=get_category_colors
                     )
+
+            with comparison_tab:
+                render_comparison_tab(filtered_df=filtered_df)
 
     # Projects Section
     with projects_tab:
