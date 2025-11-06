@@ -77,21 +77,63 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
     if not filtered_group_agg.empty:
         if visualization_type == "Treemap":
             # Create hierarchical treemap with customer groups and underlying customers
-            # Group by both customer_group and customer_name to build hierarchy
+            # Aggregate ALL metrics for customer level (for hover templates)
             customer_level_data = filtered_df.groupby(["customer_group", "customer_name"]).agg({
-                metric_column: "sum" if metric_column in ["hours_used", "hours_billable", "Fee", "Total cost", "Total profit"] else "first"
+                "hours_used": "sum",
+                "hours_billable": "sum",
+                "project_number": "nunique"
             }).reset_index()
 
-            # Build treemap data structure with proper ids, labels, parents, values
+            # Calculate additional metrics for customers
+            customer_level_data["Billability %"] = (customer_level_data["hours_billable"] / customer_level_data["hours_used"] * 100).fillna(0).round(2)
+
+            # Add fee
+            if "fee_record" in filtered_df.columns:
+                fee_by_customer = filtered_df.groupby(["customer_group", "customer_name"])["fee_record"].sum().reset_index(name="Fee")
+                customer_level_data = pd.merge(customer_level_data, fee_by_customer, on=["customer_group", "customer_name"])
+            else:
+                customer_level_data["Fee"] = 0
+
+            # Add cost
+            if "cost_record" in filtered_df.columns:
+                cost_by_customer = filtered_df.groupby(["customer_group", "customer_name"])["cost_record"].sum().reset_index(name="Total cost")
+                customer_level_data = pd.merge(customer_level_data, cost_by_customer, on=["customer_group", "customer_name"])
+            else:
+                customer_level_data["Total cost"] = 0
+
+            # Add profit
+            if "profit_record" in filtered_df.columns:
+                profit_by_customer = filtered_df.groupby(["customer_group", "customer_name"])["profit_record"].sum().reset_index(name="Total profit")
+                customer_level_data = pd.merge(customer_level_data, profit_by_customer, on=["customer_group", "customer_name"])
+            else:
+                customer_level_data["Total profit"] = 0
+
+            # Calculate rates
+            customer_level_data["Billable rate"] = 0
+            mask = customer_level_data["hours_billable"] > 0
+            customer_level_data.loc[mask, "Billable rate"] = customer_level_data.loc[mask, "Fee"] / customer_level_data.loc[mask, "hours_billable"]
+
+            customer_level_data["Effective rate"] = 0
+            mask = customer_level_data["hours_used"] > 0
+            customer_level_data.loc[mask, "Effective rate"] = customer_level_data.loc[mask, "Fee"] / customer_level_data.loc[mask, "hours_used"]
+
+            # Calculate profit margin
+            customer_level_data["Profit margin %"] = 0.0
+            mask = customer_level_data["Fee"] > 0
+            customer_level_data.loc[mask, "Profit margin %"] = (customer_level_data.loc[mask, "Total profit"] / customer_level_data.loc[mask, "Fee"] * 100).round(2)
+
+            # Build treemap data structure with proper ids, labels, parents, values, AND customdata
             # Start with ROOT node to enable proper depth control
             ids = ["ROOT"]
             labels = ["All Groups"]
             parents = [""]
             values = [0]  # Will be calculated from children
+            customdata_list = []  # Will hold customdata for each node
 
             # Track which customer groups we've added
             group_totals = {}
             group_ids = {}
+            group_metrics = {}  # Store aggregated metrics for each group
 
             # First pass: add all customer groups and their customers
             for _, row in customer_level_data.iterrows():
@@ -108,16 +150,91 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                     parents.append("ROOT")  # Parent is ROOT node
                     group_totals[group] = 0
                     values.append(0)  # Will be filled in with children sum
+                    # Initialize group metrics accumulator
+                    group_metrics[group] = {
+                        "hours_used": 0,
+                        "hours_billable": 0,
+                        "project_number": 0,
+                        "Fee": 0,
+                        "Total cost": 0,
+                        "Total profit": 0
+                    }
 
-                # Add customer under group
+                # Accumulate metrics for the group
+                group_metrics[group]["hours_used"] += row["hours_used"]
+                group_metrics[group]["hours_billable"] += row["hours_billable"]
+                group_metrics[group]["project_number"] += row["project_number"]
+                group_metrics[group]["Fee"] += row["Fee"]
+                group_metrics[group]["Total cost"] += row["Total cost"]
+                group_metrics[group]["Total profit"] += row["Total profit"]
+
+                # Add customer under group (customdata will be added later to ensure order matches)
                 customer_id = f"customer_{group}_{customer}"
                 ids.append(customer_id)
                 labels.append(str(customer))
                 parents.append(group_ids[group])
                 values.append(metric_value)
+
                 group_totals[group] += metric_value
 
-            # Update group totals in values list
+            # Build final customdata list matching the exact order of ids
+            # Strategy: Build a map of id -> customdata, then construct final list in id order
+            customdata_map = {}
+
+            # ROOT customdata
+            customdata_map["ROOT"] = [0] * 19
+
+            # Group customdata (calculate for each group)
+            for group_name in group_ids.keys():
+                gm = group_metrics[group_name]
+                billability = (gm["hours_billable"] / gm["hours_used"] * 100) if gm["hours_used"] > 0 else 0
+                billable_rate = gm["Fee"] / gm["hours_billable"] if gm["hours_billable"] > 0 else 0
+                effective_rate = gm["Fee"] / gm["hours_used"] if gm["hours_used"] > 0 else 0
+                profit_margin = (gm["Total profit"] / gm["Fee"] * 100) if gm["Fee"] > 0 else 0
+
+                group_customdata = [
+                    gm["hours_used"],
+                    gm["hours_billable"],
+                    billability,
+                    gm["project_number"],
+                    billable_rate,
+                    effective_rate,
+                    gm["Fee"],
+                    0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    gm["Total cost"],
+                    gm["Total profit"],
+                    profit_margin
+                ]
+                customdata_map[group_ids[group_name]] = group_customdata
+
+            # Now rebuild customdata_list as a map for customers
+            # Reset and rebuild properly mapped to customer IDs
+            customer_customdata_map = {}
+            for _, row in customer_level_data.iterrows():
+                group = row["customer_group"]
+                customer = row["customer_name"]
+                customer_id = f"customer_{group}_{customer}"
+
+                customer_customdata_map[customer_id] = [
+                    row["hours_used"],              # [0]
+                    row["hours_billable"],          # [1]
+                    row["Billability %"],           # [2]
+                    row["project_number"],          # [3]
+                    row["Billable rate"],           # [4]
+                    row["Effective rate"],          # [5]
+                    row["Fee"],                     # [6]
+                    0, 0, 0, 0, 0, 0, 0, 0, 0,     # [7-15] planned/variance (not used)
+                    row["Total cost"],              # [16]
+                    row["Total profit"],            # [17]
+                    row["Profit margin %"]          # [18]
+                ]
+
+            customdata_map.update(customer_customdata_map)
+
+            # Build final_customdata in the exact same order as ids list
+            final_customdata = [customdata_map.get(id_, [0]*19) for id_ in ids]
+
+            # Update group values in the values list
             for i, id_ in enumerate(ids):
                 if id_.startswith("group_"):
                     group_name = id_.replace("group_", "")
@@ -165,6 +282,7 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                 parents=parents,
                 values=values,
                 branchvalues="total",  # Calculate parent values from children
+                customdata=final_customdata,  # Add full customdata for hover templates
                 marker=dict(
                     colors=colors_list,  # Discrete colors per tile
                     line=dict(width=2, color="white")  # White borders for separation
