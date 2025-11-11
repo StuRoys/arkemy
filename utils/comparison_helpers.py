@@ -72,6 +72,24 @@ def format_period_label(start_date: datetime, end_date: datetime) -> str:
     return f"{start_date.strftime('%b %-d, %Y')} - {end_date.strftime('%b %-d, %Y')}"
 
 
+def format_period_label_short(start_date: datetime, end_date: datetime) -> str:
+    """
+    Format period date range in short format for card headers.
+
+    Args:
+        start_date: Period start
+        end_date: Period end
+
+    Returns:
+        Formatted string like "JUL-SEP 2025" or "APR-JUN 2025"
+    """
+    start_month = start_date.strftime('%b').upper()
+    end_month = end_date.strftime('%b').upper()
+    year = end_date.strftime('%Y')
+
+    return f"{start_month}-{end_month} {year}"
+
+
 def aggregate_period_metrics(
     df: pd.DataFrame,
     start_date: datetime,
@@ -157,7 +175,7 @@ def calculate_comparison(
             }
         }
     """
-    metrics_to_compare = ['effective_rate', 'billability', 'fee', 'profit', 'profit_margin']
+    metrics_to_compare = ['hours_used', 'effective_rate', 'billability', 'fee', 'profit', 'profit_margin']
     comparison = {}
 
     for metric in metrics_to_compare:
@@ -255,11 +273,16 @@ def get_metric_config() -> Dict[str, Dict[str, any]]:
     Returns:
         Dictionary with metric display properties:
         - label: Display name
-        - unit: Unit type ('currency', 'percentage', 'percentage_points')
+        - unit: Unit type ('currency', 'percentage', 'percentage_points', 'hours')
         - format: Format string
         - positive_is_good: Whether increases are positive (for color coding)
     """
     return {
+        'hours_used': {
+            'label': 'Hours Used',
+            'unit': 'hours',
+            'positive_is_good': True
+        },
         'effective_rate': {
             'label': 'Effective Rate',
             'unit': 'currency_per_hour',

@@ -254,8 +254,6 @@ def render_data_loaded_status():
 def main():
     """Main page logic."""
 
-    # Page header
-    st.subheader("📊 Analytics Dashboard")
 
     # Try to load data
     data_loaded = render_data_loading_interface()
