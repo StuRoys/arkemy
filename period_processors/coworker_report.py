@@ -8,6 +8,7 @@ from period_charts.coworker_comparison import render_comparison_chart
 from period_charts.coworker_hours_flow import render_hours_flow_chart
 from period_charts.coworker_utils import render_details_section, render_data_section
 from period_translations.translations import t
+from utils.localhost_selector import is_localhost, render_localhost_file_selector
 
 def get_data_directory():
     """Get the appropriate data directory - prioritize project data over temp"""
@@ -30,12 +31,33 @@ def get_data_directory():
 
 def try_autoload_coworker_data():
     """Try to autoload coworker data from data directory."""
+    # LOCALHOST MODE: Show file selector
+    if is_localhost():
+        selected_client, selected_file_path = render_localhost_file_selector(
+            session_prefix="coworker_",
+            file_extensions=('.csv',),
+            title="📂 Coworker Report Data (Localhost)"
+        )
+
+        if not selected_file_path:
+            # No file selected - return None to trigger "no data" message
+            return None
+
+        # Load the selected CSV file
+        try:
+            df = pd.read_csv(selected_file_path, usecols=lambda x: x != 'Unnamed: 0')
+            return df
+        except Exception as e:
+            st.error(f"Could not load {os.path.basename(selected_file_path)}: {str(e)}")
+            return None
+
+    # PRODUCTION MODE: Auto-load from /data
     data_dir = get_data_directory()
-    
+
     # Look for CSV files that might contain coworker data
     # Common patterns: coworker*.csv, person*.csv, employee*.csv, medarbeider*.csv (Norwegian)
     patterns = ['*coworker_report*.csv', 'coworker*.csv', 'person*.csv', 'employee*.csv', 'medarbeider*.csv', 'people*.csv']
-    
+
     for pattern in patterns:
         files = glob.glob(os.path.join(data_dir, pattern))
         if files:
@@ -47,7 +69,7 @@ def try_autoload_coworker_data():
             except Exception as e:
                 st.warning(f"Could not load {os.path.basename(filepath)}: {str(e)}")
                 continue
-    
+
     # If no pattern matches, try to load any CSV and check if it has coworker-like columns
     csv_files = glob.glob(os.path.join(data_dir, '*.csv'))
     for filepath in csv_files:
@@ -59,7 +81,7 @@ def try_autoload_coworker_data():
                 return df
         except Exception as e:
             continue
-    
+
     return None
 
 def apply_period_filter(df, filter_type, filter_params):

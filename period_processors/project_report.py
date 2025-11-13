@@ -7,6 +7,7 @@ from period_translations.translations import t
 from period_charts.project_hours import render_project_hours_chart
 from period_charts.project_fees import render_project_fees_chart
 from period_charts.project_rate import render_project_rate_chart
+from utils.localhost_selector import is_localhost, render_localhost_file_selector
 
 def transform_parquet_to_project_report(parquet_path):
     """
@@ -183,6 +184,28 @@ def get_data_directory():
 
 def try_autoload_project_data():
     """Try to autoload project data from data directory."""
+    # LOCALHOST MODE: Show file selector
+    if is_localhost():
+        selected_client, selected_file_path = render_localhost_file_selector(
+            session_prefix="project_",
+            file_extensions=('.parquet', '.pq'),
+            title="📂 Project Report Data (Localhost)"
+        )
+
+        if not selected_file_path:
+            # No file selected - return None to trigger "no data" message
+            return None
+
+        # Load and transform the selected parquet file
+        try:
+            transformed_df = transform_parquet_to_project_report(selected_file_path)
+            if transformed_df is not None and not transformed_df.empty:
+                return transformed_df
+        except Exception as e:
+            st.error(f"Could not transform {os.path.basename(selected_file_path)}: {str(e)}")
+            return None
+
+    # PRODUCTION MODE: Auto-load from /data
     data_dir = get_data_directory()
 
     # First, try to find and transform parquet files (preferred method)

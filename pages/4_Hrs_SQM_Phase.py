@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import os
 import glob
+from utils.localhost_selector import is_localhost, render_localhost_file_selector
 
 st.set_page_config(
     page_title="Hours / m2 / phase (beta)",
@@ -34,6 +35,27 @@ def get_data_directory():
 
 def try_autoload_sqm_data():
     """Try to autoload SQM data from data directory."""
+    # LOCALHOST MODE: Show file selector
+    if is_localhost():
+        selected_client, selected_file_path = render_localhost_file_selector(
+            session_prefix="sqm_",
+            file_extensions=('.csv',),
+            title="📂 Hours/SQM Data (Localhost)"
+        )
+
+        if not selected_file_path:
+            # No file selected - return None to trigger "no data" message
+            return None
+
+        # Load the selected CSV file
+        try:
+            df = pd.read_csv(selected_file_path)
+            return df
+        except Exception as e:
+            st.error(f"Could not load {os.path.basename(selected_file_path)}: {str(e)}")
+            return None
+
+    # PRODUCTION MODE: Auto-load from /data
     data_dir = get_data_directory()
 
     # Look for CSV files that might contain SQM data

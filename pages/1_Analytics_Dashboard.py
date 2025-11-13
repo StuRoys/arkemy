@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import glob
 from pathlib import Path
+from utils.localhost_selector import is_localhost, render_localhost_file_selector
 
 # Set page configuration
 st.set_page_config(
@@ -20,48 +21,6 @@ def is_debug_mode():
         return True
     # Fall back to session state for development
     return st.session_state.get('debug_mode', False)
-
-def is_localhost():
-    """Check if running in localhost mode via st.secrets."""
-    try:
-        return st.secrets.get("localhost", False)
-    except:
-        return False
-
-def get_client_directories():
-    """Get list of client subdirectories in /data (localhost only)."""
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
-    if not os.path.exists(data_dir):
-        return []
-
-    clients = []
-    for item in os.listdir(data_dir):
-        item_path = os.path.join(data_dir, item)
-        if os.path.isdir(item_path) and not item.startswith('.'):
-            clients.append(item)
-
-    return sorted(clients)
-
-def get_parquet_files_in_client(client_name):
-    """Get list of parquet files in a client directory."""
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
-    client_dir = os.path.join(data_dir, client_name)
-
-    if not os.path.exists(client_dir):
-        return []
-
-    parquet_files = []
-    for file in os.listdir(client_dir):
-        if file.endswith(('.parquet', '.pq')):
-            file_path = os.path.join(client_dir, file)
-            size_mb = round(os.path.getsize(file_path) / (1024 * 1024), 2)
-            parquet_files.append({
-                'name': file,
-                'path': file_path,
-                'size_mb': size_mb
-            })
-
-    return sorted(parquet_files, key=lambda x: x['name'])
 
 def get_data_directory():
     """Get the appropriate data directory - prioritize project data over temp"""
@@ -111,88 +70,60 @@ if 'transformed_df' not in st.session_state:
     st.session_state.transformed_df = None
 if 'currency' not in st.session_state:
     st.session_state.currency = 'nok'
-if 'selected_client' not in st.session_state:
-    st.session_state.selected_client = None
-if 'selected_file' not in st.session_state:
-    st.session_state.selected_file = None
-
-def render_localhost_file_selector():
-    """Render client/file selector in sidebar for localhost mode."""
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📂 Data Selection (Localhost)")
-
-    clients = get_client_directories()
-
-    if not clients:
-        st.sidebar.info("No client directories found in /data")
-        return None
-
-    # Client selector
-    selected_client = st.sidebar.selectbox(
-        "Select Client",
-        options=clients,
-        index=clients.index(st.session_state.selected_client) if st.session_state.selected_client in clients else 0,
-        key="client_selector"
-    )
-
-    # Update session state and reset file if client changed
-    if selected_client != st.session_state.selected_client:
-        st.session_state.selected_client = selected_client
-        st.session_state.selected_file = None
-
-    # File selector
-    files = get_parquet_files_in_client(selected_client)
-
-    if not files:
-        st.sidebar.info("No parquet files in this client directory")
-        return None
-
-    file_options = {f"{f['name']} ({f['size_mb']} MB)": f['path'] for f in files}
-    file_display = list(file_options.keys())
-
-    selected_file_display = st.sidebar.selectbox(
-        "Select File",
-        options=file_display,
-        key="file_selector"
-    )
-
-    st.session_state.selected_file = file_options[selected_file_display]
-    return st.session_state.selected_file
+if 'loaded_file_path' not in st.session_state:
+    st.session_state.loaded_file_path = None
 
 def render_data_loading_interface():
     """Render the clean data loading interface for users."""
     from utils.unified_data_loader import load_data_hybrid, load_data_from_upload, UnifiedDataLoader
     from utils.admin_helpers import is_admin_authenticated
 
-    # Check if data is already loaded
-    if st.session_state.csv_loaded and st.session_state.transformed_df is not None:
-        # For regular users: no status messages, just proceed to dashboard
-        if not is_admin_authenticated():
-            return True
-        else:
-            # For admins: show minimal status in sidebar or expander
-            render_admin_data_status()
-            return True
-
     # Try to load data silently for regular users
     debug_mode = is_debug_mode()
     is_admin = is_admin_authenticated()
 
-    # LOCALHOST MODE: Show file selector and load selected file
+    # LOCALHOST MODE: Always show file selector, check if we need to reload data
     if is_localhost():
-        selected_file_path = render_localhost_file_selector()
+        selected_client, selected_file_path = render_localhost_file_selector(
+            session_prefix="",
+            file_extensions=('.parquet', '.pq')
+        )
 
-        if selected_file_path:
-            # Load the selected file
-            loader = UnifiedDataLoader()
-            loading_results = loader.load_unified_data(selected_file_path, show_debug=debug_mode, silent_mode=False)
-            loading_results['loading_method'] = 'localhost_selection'
-            loading_results['data_source_path'] = os.path.dirname(selected_file_path)
-        else:
-            # No file selected yet
+        # No file selected (either placeholder or client has no files)
+        if not selected_file_path:
+            # Show current data if any is loaded, otherwise show nothing
+            if st.session_state.csv_loaded and st.session_state.transformed_df is not None:
+                return True
             return False
+
+        # Check if this file is already loaded
+        if (st.session_state.csv_loaded and
+            st.session_state.transformed_df is not None and
+            st.session_state.loaded_file_path == selected_file_path):
+            # Data already loaded for this file, proceed to dashboard
+            return True
+
+        # Need to load new file (either first load or file changed)
+        loader = UnifiedDataLoader()
+        loading_results = loader.load_unified_data(selected_file_path, show_debug=debug_mode, silent_mode=False)
+        loading_results['loading_method'] = 'localhost_selection'
+        loading_results['data_source_path'] = os.path.dirname(selected_file_path)
+
+        # Track which file was loaded
+        if loading_results.get('success'):
+            st.session_state.loaded_file_path = selected_file_path
     else:
-        # PRODUCTION MODE: Silent loading for regular users, verbose for admins
+        # PRODUCTION MODE: Check if data is already loaded
+        if st.session_state.csv_loaded and st.session_state.transformed_df is not None:
+            # For regular users: no status messages, just proceed to dashboard
+            if not is_admin_authenticated():
+                return True
+            else:
+                # For admins: show minimal status in sidebar or expander
+                render_admin_data_status()
+                return True
+
+        # Silent loading for regular users, verbose for admins
         loading_results = load_data_hybrid(
             volume_paths=["/data", "./data"],
             show_debug=debug_mode and is_admin,
