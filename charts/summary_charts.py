@@ -592,67 +592,57 @@ def get_customer_insights(df: pd.DataFrame, top_n: int = 3) -> Dict[str, Any]:
 def get_project_type_insights(df: pd.DataFrame, top_n: int = 3) -> Dict[str, Any]:
     """
     Extracts key insights about project types from the filtered data.
-    
+
     Args:
         df: Filtered DataFrame
         top_n: Number of top project types to return
-        
+
     Returns:
         Dictionary with project type insights
     """
+    from utils.processors import get_project_tag_columns, aggregate_by_project_tag
+
     insights = {}
-    
+
     # Check if dataframe is empty or lacks necessary columns
-    if df.empty or "project_tag" not in df.columns:
+    available_tags = get_project_tag_columns(df)
+    if df.empty or not available_tags:
         return insights
-    
-    # Calculate project type metrics
-    project_type_agg = df.groupby(["project_tag"]).agg({
-        "hours_used": "sum",
-        "project_number": "nunique"
-    }).reset_index()
-    
-    # Check if we can calculate fee
-    has_fee = "billable_rate_record" in df.columns and "hours_billable" in df.columns
-    
-    if has_fee:
-        # Calculate fee directly in the aggregation
-        project_type_fee = {}
-        
-        # For each project type, calculate total fee
-        for project_type in df["project_tag"].unique():
-            project_df = df[df["project_tag"] == project_type]
-            fee = (project_df["hours_billable"] * project_df["billable_rate_record"]).sum()
-            project_type_fee[project_type] = fee
-        
-        # Add fee to aggregated data
-        project_type_agg["Fee"] = project_type_agg["project_tag"].map(project_type_fee)
-        
-        # Calculate hourly rate
-        project_type_agg["Rate"] = project_type_agg["Fee"] / project_type_agg["hours_used"].where(project_type_agg["hours_used"] > 0, 1)
-        
-        # Calculate total fee for percentage calculation
-        total_fee = project_type_agg["Fee"].sum()
-    
+
+    # Use the first (legacy) tag column for summary insights
+    tag_column = available_tags[0]
+
+    # Calculate project type metrics using the generic function
+    project_type_agg = aggregate_by_project_tag(df, tag_column=tag_column)
+
+    if project_type_agg.empty:
+        return insights
+
+    # Check if we have fee data
+    has_fee = "Fee" in project_type_agg.columns
+
+    # Calculate total fee for percentage calculation
+    total_fee = project_type_agg["Fee"].sum() if has_fee else 0
+
     # Store top project types data
     top_project_types_list = []
     for _, project_type in project_type_agg.iterrows():
         project_type_info = {
-            "name": project_type["project_tag"],
+            "name": project_type[tag_column],
             "hours": project_type["hours_used"],
-            "projects": project_type["project_number"]
+            "projects": project_type["Number of projects"]
         }
-        
+
         if has_fee:
             project_type_info["fee"] = project_type["Fee"]
-            project_type_info["rate"] = project_type["Rate"]
+            project_type_info["rate"] = project_type["Effective rate"]
             project_type_info["fee_percentage"] = (project_type["Fee"] / total_fee * 100) if total_fee > 0 else 0
-        
+
         top_project_types_list.append(project_type_info)
-    
+
     insights["top_project_types"] = top_project_types_list
     insights["total_project_types"] = len(project_type_agg)
-    
+
     return insights
 
 

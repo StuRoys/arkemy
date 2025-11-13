@@ -77,6 +77,16 @@ Before ANY Railway deployment:
 
 **REMEMBER**: User wants to test first, commit second, deploy third - all with explicit approval
 
+## 🎯 STREAMLIT DEVELOPMENT GUIDELINES
+
+**This is a Streamlit project. Framework-specific guidelines are loaded from:**
+- `~/.claude/streamlit-guidelines.md` (via global CLAUDE.md framework detection)
+
+**Key patterns used in this project:**
+- Use `format_func` for display label mapping (see [charts/project_type_charts.py:51](charts/project_type_charts.py#L51))
+- Static widget keys without counters (see [charts/project_type_charts.py:13](charts/project_type_charts.py#L13))
+- Accept tab reset behavior as expected Streamlit behavior
+
 ## Communication Style
 - **Chat summaries should be sober, concise and factual**
 - **User does not need flair, emojis, or success messages**

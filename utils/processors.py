@@ -1,7 +1,68 @@
 # processors.py
 import pandas as pd
 import numpy as np
+import re
 from typing import Dict, List, Tuple, Any, Optional
+from utils.tag_manager import get_tag_display_name
+
+
+def get_project_tag_columns(df: pd.DataFrame) -> list:
+    """
+    Detect all project tag columns in the dataframe.
+    Handles both 'project_tag' (legacy) and 'project_tag_*' (indexed) patterns.
+
+    Args:
+        df: DataFrame to search
+
+    Returns:
+        List of tag column names in order: ['project_tag', 'project_tag_1', 'project_tag_2', ...]
+    """
+    tag_cols = []
+
+    # Check for legacy 'project_tag' first
+    if 'project_tag' in df.columns:
+        tag_cols.append('project_tag')
+
+    # Check for indexed 'project_tag_1', 'project_tag_2', etc.
+    indexed_pattern = r"^project_tag_(\d+)$"
+    indexed_cols = []
+
+    for col in df.columns:
+        match = re.match(indexed_pattern, col)
+        if match:
+            index = int(match.group(1))
+            indexed_cols.append((index, col))
+
+    # Sort by index number and append
+    indexed_cols.sort(key=lambda x: x[0])
+    tag_cols.extend([col for _, col in indexed_cols])
+
+    return tag_cols
+
+
+def get_project_tag_columns_with_labels(df: pd.DataFrame, tag_mappings: Dict[str, str] = None) -> Dict[str, str]:
+    """
+    Get project tag columns with their display labels.
+
+    Args:
+        df: DataFrame to search
+        tag_mappings: Optional mapping of column_name -> display_label from extract_tag_mappings()
+
+    Returns:
+        Dictionary mapping: {column_name: display_label}
+        Example: {'project_tag_1': 'Prosjekttype', 'project_tag_2': 'Prosjektfase'}
+    """
+    if tag_mappings is None:
+        tag_mappings = {}
+
+    tag_cols = get_project_tag_columns(df)
+    result = {}
+
+    for col in tag_cols:
+        display_name = get_tag_display_name(col, tag_mappings)
+        result[col] = display_name
+
+    return result
 
 
 def calculate_summary_metrics(df: pd.DataFrame) -> Dict[str, Any]:
@@ -463,72 +524,85 @@ def aggregate_by_project(df: pd.DataFrame) -> pd.DataFrame:
     return project_agg
 
 
-def aggregate_by_project_type(df: pd.DataFrame) -> pd.DataFrame:
+def aggregate_by_project_tag(df: pd.DataFrame, tag_column: str = "project_tag") -> pd.DataFrame:
     """
-    Aggregate data by project type.
-    
+    Aggregate data by project tag dimension.
+
     Args:
         df: Validated and transformed dataframe
-        
+        tag_column: Name of tag column to group by (e.g., "project_tag", "project_tag_1", "project_tag_2")
+
     Returns:
-        Dataframe with project type aggregations
+        Dataframe with project tag aggregations
     """
-    project_type_agg = df.groupby(["project_tag"]).agg({
+    # Check if tag column exists
+    if tag_column not in df.columns:
+        return pd.DataFrame()
+
+    project_tag_agg = df.groupby([tag_column]).agg({
         "hours_used": "sum",
         "hours_billable": "sum",
         "project_number": "nunique",
         "person_name": "nunique"
     }).reset_index()
-    
-    project_type_agg["Non-billable hours"] = project_type_agg["hours_used"] - project_type_agg["hours_billable"]
-    project_type_agg["Billability %"] = (project_type_agg["hours_billable"] / project_type_agg["hours_used"] * 100).round(2)
-    project_type_agg.rename(columns={
+
+    project_tag_agg["Non-billable hours"] = project_tag_agg["hours_used"] - project_tag_agg["hours_billable"]
+    project_tag_agg["Billability %"] = (project_tag_agg["hours_billable"] / project_tag_agg["hours_used"] * 100).round(2)
+    project_tag_agg.rename(columns={
         "project_number": "Number of projects",
         "person_name": "Number of people"
     }, inplace=True)
-    
+
     # Add fee (new approach with fallback)
     if "fee_record" in df.columns:
-        fee_by_type = df.groupby("project_tag")["fee_record"].sum().reset_index(name="Fee")
-        project_type_agg = pd.merge(project_type_agg, fee_by_type, on="project_tag")
+        fee_by_tag = df.groupby(tag_column)["fee_record"].sum().reset_index(name="Fee")
+        project_tag_agg = pd.merge(project_tag_agg, fee_by_tag, on=tag_column)
     elif "billable_rate_record" in df.columns:
         # Fallback to old calculation
-        fee_by_type = df.groupby("project_tag").apply(
+        fee_by_tag = df.groupby(tag_column).apply(
             lambda x: (x["hours_billable"] * x["billable_rate_record"]).sum()
         ).reset_index(name="Fee")
-        project_type_agg = pd.merge(project_type_agg, fee_by_type, on="project_tag")
+        project_tag_agg = pd.merge(project_tag_agg, fee_by_tag, on=tag_column)
     else:
-        project_type_agg["Fee"] = 0
-    
+        project_tag_agg["Fee"] = 0
+
     # Add cost
     if "cost_record" in df.columns:
-        cost_by_type = df.groupby("project_tag")["cost_record"].sum().reset_index(name="Total cost")
-        project_type_agg = pd.merge(project_type_agg, cost_by_type, on="project_tag")
+        cost_by_tag = df.groupby(tag_column)["cost_record"].sum().reset_index(name="Total cost")
+        project_tag_agg = pd.merge(project_tag_agg, cost_by_tag, on=tag_column)
     else:
-        project_type_agg["Total cost"] = 0
-    
+        project_tag_agg["Total cost"] = 0
+
     # Add profit
     if "profit_record" in df.columns:
-        profit_by_type = df.groupby("project_tag")["profit_record"].sum().reset_index(name="Total profit")
-        project_type_agg = pd.merge(project_type_agg, profit_by_type, on="project_tag")
+        profit_by_tag = df.groupby(tag_column)["profit_record"].sum().reset_index(name="Total profit")
+        project_tag_agg = pd.merge(project_tag_agg, profit_by_tag, on=tag_column)
     else:
-        project_type_agg["Total profit"] = 0
-    
+        project_tag_agg["Total profit"] = 0
+
     # Calculate rates
-    project_type_agg["Billable rate"] = 0  # Default
-    mask = project_type_agg["hours_billable"] > 0
-    project_type_agg.loc[mask, "Billable rate"] = project_type_agg.loc[mask, "Fee"] / project_type_agg.loc[mask, "hours_billable"]
-    
-    project_type_agg["Effective rate"] = 0  # Default
-    mask = project_type_agg["hours_used"] > 0
-    project_type_agg.loc[mask, "Effective rate"] = project_type_agg.loc[mask, "Fee"] / project_type_agg.loc[mask, "hours_used"]
-    
+    project_tag_agg["Billable rate"] = 0  # Default
+    mask = project_tag_agg["hours_billable"] > 0
+    project_tag_agg.loc[mask, "Billable rate"] = project_tag_agg.loc[mask, "Fee"] / project_tag_agg.loc[mask, "hours_billable"]
+
+    project_tag_agg["Effective rate"] = 0  # Default
+    mask = project_tag_agg["hours_used"] > 0
+    project_tag_agg.loc[mask, "Effective rate"] = project_tag_agg.loc[mask, "Fee"] / project_tag_agg.loc[mask, "hours_used"]
+
     # Calculate profit margin
-    project_type_agg["Profit margin %"] = 0.0
-    mask = project_type_agg["Fee"] > 0
-    project_type_agg.loc[mask, "Profit margin %"] = (project_type_agg.loc[mask, "Total profit"] / project_type_agg.loc[mask, "Fee"] * 100).round(2)
-    
-    return project_type_agg
+    project_tag_agg["Profit margin %"] = 0.0
+    mask = project_tag_agg["Fee"] > 0
+    project_tag_agg.loc[mask, "Profit margin %"] = (project_tag_agg.loc[mask, "Total profit"] / project_tag_agg.loc[mask, "Fee"] * 100).round(2)
+
+    return project_tag_agg
+
+
+def aggregate_by_project_type(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Deprecated: Use aggregate_by_project_tag() instead.
+    This function is kept for backward compatibility.
+    """
+    return aggregate_by_project_tag(df, tag_column="project_tag")
 
 
 def aggregate_by_phase(df: pd.DataFrame) -> pd.DataFrame:

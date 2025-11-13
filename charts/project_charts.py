@@ -30,10 +30,9 @@ from utils.chart_helpers import (
 )
 
 def get_widget_key(base_key: str, nav_context: str = "project_details") -> str:
-    """Generate navigation-specific widget keys for project charts"""
-    # Include navigation counter to force widget recreation on tab switch
-    counter = st.session_state.get('project_nav_counter', 0)
-    return f"{nav_context}_{base_key}_{counter}"
+    """Generate stable widget keys for project charts"""
+    # Use static keys to preserve widget state across reruns
+    return f"{nav_context}_{base_key}"
 
 def render_project_tab(filtered_df, aggregate_by_project, render_chart, get_category_colors, planned_df=None, filter_settings=None):
     """

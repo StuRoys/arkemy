@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Tuple, Any
 from pathlib import Path
 
 from utils.schema_manager import SchemaManager
+from utils.tag_manager import extract_tag_mappings
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +167,12 @@ class UnifiedDataLoader:
             # Analyze data structure
             analysis = self.analyze_data_structure(df)
             results['analysis'] = analysis
+
+            # Extract tag mappings from metadata row
+            tag_mappings = extract_tag_mappings(df)
+            st.session_state['tag_mappings'] = tag_mappings
+            if show_debug and tag_mappings:
+                st.success(f"✅ Extracted tag mappings: {tag_mappings}")
 
             if show_debug:
                 st.info("📊 **Data Analysis Results**")
