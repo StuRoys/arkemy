@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import glob
+from pathlib import Path
 
 # Set page configuration
 st.set_page_config(
@@ -19,6 +20,48 @@ def is_debug_mode():
         return True
     # Fall back to session state for development
     return st.session_state.get('debug_mode', False)
+
+def is_localhost():
+    """Check if running in localhost mode via st.secrets."""
+    try:
+        return st.secrets.get("localhost", False)
+    except:
+        return False
+
+def get_client_directories():
+    """Get list of client subdirectories in /data (localhost only)."""
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+    if not os.path.exists(data_dir):
+        return []
+
+    clients = []
+    for item in os.listdir(data_dir):
+        item_path = os.path.join(data_dir, item)
+        if os.path.isdir(item_path) and not item.startswith('.'):
+            clients.append(item)
+
+    return sorted(clients)
+
+def get_parquet_files_in_client(client_name):
+    """Get list of parquet files in a client directory."""
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+    client_dir = os.path.join(data_dir, client_name)
+
+    if not os.path.exists(client_dir):
+        return []
+
+    parquet_files = []
+    for file in os.listdir(client_dir):
+        if file.endswith(('.parquet', '.pq')):
+            file_path = os.path.join(client_dir, file)
+            size_mb = round(os.path.getsize(file_path) / (1024 * 1024), 2)
+            parquet_files.append({
+                'name': file,
+                'path': file_path,
+                'size_mb': size_mb
+            })
+
+    return sorted(parquet_files, key=lambda x: x['name'])
 
 def get_data_directory():
     """Get the appropriate data directory - prioritize project data over temp"""
@@ -68,10 +111,57 @@ if 'transformed_df' not in st.session_state:
     st.session_state.transformed_df = None
 if 'currency' not in st.session_state:
     st.session_state.currency = 'nok'
+if 'selected_client' not in st.session_state:
+    st.session_state.selected_client = None
+if 'selected_file' not in st.session_state:
+    st.session_state.selected_file = None
+
+def render_localhost_file_selector():
+    """Render client/file selector in sidebar for localhost mode."""
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📂 Data Selection (Localhost)")
+
+    clients = get_client_directories()
+
+    if not clients:
+        st.sidebar.info("No client directories found in /data")
+        return None
+
+    # Client selector
+    selected_client = st.sidebar.selectbox(
+        "Select Client",
+        options=clients,
+        index=clients.index(st.session_state.selected_client) if st.session_state.selected_client in clients else 0,
+        key="client_selector"
+    )
+
+    # Update session state and reset file if client changed
+    if selected_client != st.session_state.selected_client:
+        st.session_state.selected_client = selected_client
+        st.session_state.selected_file = None
+
+    # File selector
+    files = get_parquet_files_in_client(selected_client)
+
+    if not files:
+        st.sidebar.info("No parquet files in this client directory")
+        return None
+
+    file_options = {f"{f['name']} ({f['size_mb']} MB)": f['path'] for f in files}
+    file_display = list(file_options.keys())
+
+    selected_file_display = st.sidebar.selectbox(
+        "Select File",
+        options=file_display,
+        key="file_selector"
+    )
+
+    st.session_state.selected_file = file_options[selected_file_display]
+    return st.session_state.selected_file
 
 def render_data_loading_interface():
     """Render the clean data loading interface for users."""
-    from utils.unified_data_loader import load_data_hybrid, load_data_from_upload
+    from utils.unified_data_loader import load_data_hybrid, load_data_from_upload, UnifiedDataLoader
     from utils.admin_helpers import is_admin_authenticated
 
     # Check if data is already loaded
@@ -88,15 +178,29 @@ def render_data_loading_interface():
     debug_mode = is_debug_mode()
     is_admin = is_admin_authenticated()
 
-    # Silent loading for regular users, verbose for admins
-    loading_results = load_data_hybrid(
-        volume_paths=["/data", "./data"],
-        show_debug=debug_mode and is_admin,
-        silent_mode=not is_admin
-    )
+    # LOCALHOST MODE: Show file selector and load selected file
+    if is_localhost():
+        selected_file_path = render_localhost_file_selector()
 
-    if loading_results['loading_method'] == 'auto_volume':
-        # Data was auto-loaded from volume
+        if selected_file_path:
+            # Load the selected file
+            loader = UnifiedDataLoader()
+            loading_results = loader.load_unified_data(selected_file_path, show_debug=debug_mode, silent_mode=False)
+            loading_results['loading_method'] = 'localhost_selection'
+            loading_results['data_source_path'] = os.path.dirname(selected_file_path)
+        else:
+            # No file selected yet
+            return False
+    else:
+        # PRODUCTION MODE: Silent loading for regular users, verbose for admins
+        loading_results = load_data_hybrid(
+            volume_paths=["/data", "./data"],
+            show_debug=debug_mode and is_admin,
+            silent_mode=not is_admin
+        )
+
+    if loading_results['loading_method'] in ['auto_volume', 'localhost_selection']:
+        # Data was auto-loaded from volume or selected from localhost
         if loading_results['success']:
             if is_admin:
                 st.success("🎉 **Data loaded successfully!**")
@@ -104,7 +208,7 @@ def render_data_loading_interface():
             return True
         else:
             if is_admin:
-                st.error(f"❌ **Auto-loading failed**: {loading_results.get('error', 'Unknown error')}")
+                st.error(f"❌ **Loading failed**: {loading_results.get('error', 'Unknown error')}")
             else:
                 st.error("Unable to load data. Please contact administrator.")
 
@@ -163,12 +267,17 @@ def display_loading_results(results: dict):
         method_display = {
             'auto_volume': 'Auto-Loaded',
             'upload': 'Uploaded',
-            'manual': 'Manual'
+            'manual': 'Manual',
+            'localhost_selection': 'Local Selection'
         }
         loading_method = method_display.get(results['loading_method'], 'Unknown')
         if results.get('data_source_path'):
             source_type = "Volume" if results['data_source_path'] == "/data" else "Local"
-            loading_method = f"{loading_method} ({source_type})"
+            if results['loading_method'] == 'localhost_selection':
+                # For localhost, show the client name from the path
+                loading_method = f"{loading_method} ({results.get('data_source_path', 'Local')})"
+            else:
+                loading_method = f"{loading_method} ({source_type})"
         st.metric("Loading Method", loading_method)
 
     with col3:
