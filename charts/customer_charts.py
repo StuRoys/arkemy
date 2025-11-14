@@ -73,7 +73,7 @@ def render_customer_tab(filtered_df, aggregate_by_customer, render_chart, get_ca
             # Customer treemap - using filtered data with standardized custom data
             fig = px.treemap(
                 filtered_customer_agg,
-                path=["customer_name"],
+                path=["Customer name"],
                 values=metric_column,
                 color=metric_column,
                 color_continuous_scale="Purples",
@@ -105,7 +105,7 @@ def render_customer_tab(filtered_df, aggregate_by_customer, render_chart, get_ca
             # Create the bar chart with standardized custom data
             fig_bar = px.bar(
                 limited_customers,
-                x="customer_name",
+                x="Customer name",
                 y=metric_column,
                 color=metric_column,
                 color_continuous_scale="Purples",
