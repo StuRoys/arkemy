@@ -193,49 +193,87 @@ def create_project_filter(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any
     return filtered_df, filter_settings
 
 def create_project_type_filter(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-    """Create project type filter for the dataframe with include/exclude options."""
+    """Create project type filter for multiple tag categories with include/exclude options."""
     clear_rerun_lock()
     filter_settings = {}
-    
-    if 'project_tag' not in df.columns:
+
+    # Get tag mappings from session state (extracted before filtering in render_sidebar_filters)
+    tag_mappings = st.session_state.get('tag_mappings', {})
+
+    if not tag_mappings:
         return df, filter_settings
-    
-    project_types = sorted(df['project_tag'].dropna().unique().tolist())
-    
+
+    # Find all project_tag_* columns and get all unique values
+    tag_columns = [col for col in df.columns if col.startswith('project_tag_')]
+
+    if not tag_columns:
+        return df, filter_settings
+
+    # Collect all unique tag values with their category
+    tag_options = []  # List of (category, value) tuples
+
+    for tag_col in sorted(tag_columns):
+        category_name = tag_mappings.get(tag_col, tag_col)
+        for value in sorted(df[tag_col].dropna().unique().tolist()):
+            tag_options.append((category_name, value))
+
+    if not tag_options:
+        return df, filter_settings
+
+    # Create display function
+    def format_tag_option(tag_tuple):
+        category, value = tag_tuple
+        return f"{category}: {value}"
+
     current_included = st.session_state.get('project_type_included', [])
     current_excluded = st.session_state.get('project_type_excluded', [])
     indicator = " 🔴" if (current_included or current_excluded) else ""
-    
+
     with st.sidebar.expander(f"Project Type{indicator}"):
-        selected_types = st.multiselect(
+        selected_tags = st.multiselect(
             "Select specific project types",
-            options=project_types,
+            options=tag_options,
             default=current_included,
             key='project_type_included',
+            format_func=format_tag_option,
             on_change=trigger_rerun
         )
-        
-        exclude_types = st.multiselect(
+
+        exclude_tags = st.multiselect(
             "Exclude project types",
-            options=project_types,
+            options=tag_options,
             default=current_excluded,
             key='project_type_excluded',
+            format_func=format_tag_option,
             on_change=trigger_rerun
         )
-    
+
     filtered_df = df.copy()
-    
-    if selected_types:
-        filtered_df = filtered_df[filtered_df['project_tag'].isin(selected_types)]
-    
-    if exclude_types:
-        filtered_df = filtered_df[~filtered_df['project_tag'].isin(exclude_types)]
-    
-    filter_settings['include_all_types'] = len(selected_types) == 0
-    filter_settings['included_types'] = selected_types
-    filter_settings['excluded_types'] = exclude_types
-    filter_settings['project_type_active'] = len(selected_types) > 0 or len(exclude_types) > 0
-    
+
+    # Apply include filter (match any tag column)
+    if selected_tags:
+        mask = pd.Series(False, index=filtered_df.index)
+        for category, value in selected_tags:
+            # Find which tag_col matches this category
+            for tag_col in tag_columns:
+                if tag_mappings.get(tag_col, tag_col) == category:
+                    mask |= (filtered_df[tag_col] == value)
+        filtered_df = filtered_df[mask]
+
+    # Apply exclude filter (match any tag column)
+    if exclude_tags:
+        for category, value in exclude_tags:
+            for tag_col in tag_columns:
+                if tag_mappings.get(tag_col, tag_col) == category:
+                    filtered_df = filtered_df[filtered_df[tag_col] != value]
+
+    filter_settings['include_all_types'] = len(selected_tags) == 0
+    filter_settings['included_types'] = selected_tags
+    filter_settings['included_project_types'] = [v for _, v in selected_tags]  # For planned data
+    filter_settings['excluded_types'] = exclude_tags
+    filter_settings['excluded_project_types'] = [v for _, v in exclude_tags]
+    filter_settings['project_type_active'] = len(selected_tags) > 0 or len(exclude_tags) > 0
+
     return filtered_df, filter_settings
 
 

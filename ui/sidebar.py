@@ -281,6 +281,13 @@ def render_sidebar_filters(df, planned_df=None):
     """
     Render filter controls in the sidebar and return filtered dataframes and settings.
     """
+    from utils.tag_manager import extract_tag_mappings
+
+    # Extract tag mappings from ORIGINAL data before any filtering (only if not already set by data loader)
+    if 'tag_mappings' not in st.session_state or not st.session_state['tag_mappings']:
+        tag_mappings = extract_tag_mappings(df)
+        st.session_state['tag_mappings'] = tag_mappings
+
     # Create a copy of the input dataframe to avoid modifying the original
     filtered_df = df.copy()
     filter_settings = {}
