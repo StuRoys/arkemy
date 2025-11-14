@@ -173,13 +173,17 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
         # Sort by hours worked in descending order
         sorted_project_type_agg = project_type_agg.sort_values("hours_used", ascending=False)
 
+        # Rename the selected tag column to show its display name
+        display_df = sorted_project_type_agg.copy()
+        display_df = display_df.rename(columns={selected_tag_column: selected_tag_display_name})
+
         # Use the column configuration from chart_styles
         from utils.chart_styles import create_column_config
 
         # Display the table with column configurations
         st.dataframe(
-            sorted_project_type_agg,
+            display_df,
             use_container_width=True,
             hide_index=True,
-            column_config=create_column_config(sorted_project_type_agg)
+            column_config=create_column_config(display_df)
         )
