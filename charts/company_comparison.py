@@ -318,6 +318,11 @@ def render_comparison_tab(filtered_df: pd.DataFrame) -> None:
         max_date = filtered_df['record_date'].max().date()
         min_date = filtered_df['record_date'].min().date()
 
+        # Validate session state value against current data range
+        # If filters changed and old value is now outside range, reset to max_date
+        if st.session_state.comparison_end_date > max_date or st.session_state.comparison_end_date < min_date:
+            st.session_state.comparison_end_date = max_date
+
         comparison_end_date = st.date_input(
             "Period A End Date",
             value=st.session_state.comparison_end_date,
