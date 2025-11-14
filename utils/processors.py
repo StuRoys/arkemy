@@ -344,8 +344,7 @@ def aggregate_by_customer(df: pd.DataFrame) -> pd.DataFrame:
     
     customer_agg["Non-billable hours"] = customer_agg["hours_used"] - customer_agg["hours_billable"]
     customer_agg["Billability %"] = (customer_agg["hours_billable"] / customer_agg["hours_used"] * 100).round(2)
-    customer_agg.rename(columns={"project_number": "Number of projects"}, inplace=True)
-    
+
     # Add fee (new approach with fallback)
     if "fee_record" in df.columns:
         fee_by_customer = df.groupby("customer_number")["fee_record"].sum().reset_index(name="Fee")
@@ -386,7 +385,14 @@ def aggregate_by_customer(df: pd.DataFrame) -> pd.DataFrame:
     customer_agg["Profit margin %"] = 0.0
     mask = customer_agg["Fee"] > 0
     customer_agg.loc[mask, "Profit margin %"] = (customer_agg.loc[mask, "Total profit"] / customer_agg.loc[mask, "Fee"] * 100).round(2)
-    
+
+    # Rename columns for display
+    customer_agg.rename(columns={
+        "project_number": "Number of projects",
+        "customer_number": "Customer number",
+        "customer_name": "Customer name"
+    }, inplace=True)
+
     return customer_agg
 
 
