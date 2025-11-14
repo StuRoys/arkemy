@@ -128,23 +128,22 @@ def render_price_model_tab(filtered_df, aggregate_by_price_model, render_chart, 
                 st.error(f"No price models have non-zero values for {selected_metric}.")
             else:
                 st.error(f"No price models have values greater than zero for {selected_metric}.")
-        
 
-        # Display price model data table with all metrics
-        st.subheader("Price Model Data Table")
-        
-        # Sort by hours worked in descending order
-        sorted_price_model_agg = price_model_agg.sort_values("hours_used", ascending=False)
 
-        # Use the column configuration from chart_styles
-        from utils.chart_styles import create_column_config
+        # Display price model data table with all metrics in an expander
+        with st.expander("Details"):
+            # Sort by hours worked in descending order
+            sorted_price_model_agg = price_model_agg.sort_values("hours_used", ascending=False)
 
-        # Display the table with column configurations
-        st.dataframe(
-            sorted_price_model_agg,
-            use_container_width=True,
-            hide_index=True,
-            column_config=create_column_config(sorted_price_model_agg)
-        )
+            # Use the column configuration from chart_styles
+            from utils.chart_styles import create_column_config
+
+            # Display the table with column configurations
+            st.dataframe(
+                sorted_price_model_agg,
+                use_container_width=True,
+                hide_index=True,
+                column_config=create_column_config(sorted_price_model_agg)
+            )
     else:
         st.warning("Price model information is not available in the data.")

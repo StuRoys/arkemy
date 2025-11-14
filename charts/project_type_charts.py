@@ -168,19 +168,18 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
         else:
             st.error(f"No project types have values greater than zero for {selected_metric}.")
 
-    # Display project type data table with all metrics
-    st.subheader(f"Data for {selected_tag_display_name}")
+    # Display project type data table with all metrics in an expander
+    with st.expander("Details"):
+        # Sort by hours worked in descending order
+        sorted_project_type_agg = project_type_agg.sort_values("hours_used", ascending=False)
 
-    # Sort by hours worked in descending order
-    sorted_project_type_agg = project_type_agg.sort_values("hours_used", ascending=False)
+        # Use the column configuration from chart_styles
+        from utils.chart_styles import create_column_config
 
-    # Use the column configuration from chart_styles
-    from utils.chart_styles import create_column_config
-
-    # Display the table with column configurations
-    st.dataframe(
-        sorted_project_type_agg,
-        use_container_width=True,
-        hide_index=True,
-        column_config=create_column_config(sorted_project_type_agg)
-    )
+        # Display the table with column configurations
+        st.dataframe(
+            sorted_project_type_agg,
+            use_container_width=True,
+            hide_index=True,
+            column_config=create_column_config(sorted_project_type_agg)
+        )

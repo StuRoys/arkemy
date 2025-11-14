@@ -127,21 +127,20 @@ def render_people_tab(filtered_df, aggregate_by_person, render_chart, get_catego
             st.error(f"No people have non-zero values for {selected_metric}.")
         else:
             st.error(f"No people have values greater than zero for {selected_metric}.")
-    
 
-    # Display people data table with all metrics
-    st.subheader("People Data Table")
-    
-    # Sort by hours worked in descending order
-    sorted_person_agg = person_agg.sort_values("hours_used", ascending=False)
 
-    # Use the column configuration from chart_styles
-    from utils.chart_styles import create_column_config
+    # Display people data table with all metrics in an expander
+    with st.expander("Details"):
+        # Sort by hours worked in descending order
+        sorted_person_agg = person_agg.sort_values("hours_used", ascending=False)
 
-    # Display the table with column configurations
-    st.dataframe(
-        sorted_person_agg,
-        use_container_width=True,
-        hide_index=True,
-        column_config=create_column_config(sorted_person_agg)
-    )
+        # Use the column configuration from chart_styles
+        from utils.chart_styles import create_column_config
+
+        # Display the table with column configurations
+        st.dataframe(
+            sorted_person_agg,
+            use_container_width=True,
+            hide_index=True,
+            column_config=create_column_config(sorted_person_agg)
+        )

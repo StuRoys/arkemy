@@ -129,23 +129,22 @@ def render_phase_tab(filtered_df, aggregate_by_phase, render_chart, get_category
                 st.error(f"No phases have non-zero values for {selected_metric}.")
             else:
                 st.error(f"No phases have values greater than zero for {selected_metric}.")
-        
 
-        # Display phase data table with all metrics
-        st.subheader("Phase Data Table")
-        
-        # Sort by hours worked in descending order
-        sorted_phase_agg = phase_agg.sort_values("hours_used", ascending=False)
 
-        # Use the column configuration from chart_styles
-        from utils.chart_styles import create_column_config
+        # Display phase data table with all metrics in an expander
+        with st.expander("Details"):
+            # Sort by hours worked in descending order
+            sorted_phase_agg = phase_agg.sort_values("hours_used", ascending=False)
 
-        # Display the table with column configurations
-        st.dataframe(
-            sorted_phase_agg,
-            use_container_width=True,
-            hide_index=True,
-            column_config=create_column_config(sorted_phase_agg)
-        )
+            # Use the column configuration from chart_styles
+            from utils.chart_styles import create_column_config
+
+            # Display the table with column configurations
+            st.dataframe(
+                sorted_phase_agg,
+                use_container_width=True,
+                hide_index=True,
+                column_config=create_column_config(sorted_phase_agg)
+            )
     else:
         st.warning("Phase information is not available in the data.")

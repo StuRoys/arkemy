@@ -130,21 +130,20 @@ def render_activity_tab(filtered_df, aggregate_by_activity, render_chart, get_ca
             else:
                 st.error(f"No activities have values greater than zero for {selected_metric}.")
 
-        # Display activity data table with all metrics
-        st.subheader("Activity Data Table")
-        
-        # Sort by hours worked in descending order
-        sorted_activity_agg = activity_agg.sort_values("hours_used", ascending=False)
+        # Display activity data table with all metrics in an expander
+        with st.expander("Details"):
+            # Sort by hours worked in descending order
+            sorted_activity_agg = activity_agg.sort_values("hours_used", ascending=False)
 
-        # Use the column configuration from chart_styles
-        from utils.chart_styles import create_column_config
+            # Use the column configuration from chart_styles
+            from utils.chart_styles import create_column_config
 
-        # Display the table with column configurations
-        st.dataframe(
-            sorted_activity_agg,
-            use_container_width=True,
-            hide_index=True,
-            column_config=create_column_config(sorted_activity_agg)
-        )
+            # Display the table with column configurations
+            st.dataframe(
+                sorted_activity_agg,
+                use_container_width=True,
+                hide_index=True,
+                column_config=create_column_config(sorted_activity_agg)
+            )
     else:
         st.warning("Activity information is not available in the data.")

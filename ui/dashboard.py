@@ -214,20 +214,20 @@ def render_dashboard():
             st.warning("No data in selected range")
         else:
             # Clients sub-navigation using nested tabs
-            customer_groups_tab, customers_tab = st.tabs(["Customer Groups", "Customers"])
-
-            with customer_groups_tab:
-                render_customer_group_tab(
-                    filtered_df=filtered_df,
-                    aggregate_by_customer_group=aggregate_by_customer_group,
-                    render_chart=render_chart,
-                    get_category_colors=get_category_colors
-                )
+            customers_tab, customer_groups_tab = st.tabs(["Customers", "Customer Groups"])
 
             with customers_tab:
                 render_customer_tab(
                     filtered_df=filtered_df,
                     aggregate_by_customer=aggregate_by_customer,
+                    render_chart=render_chart,
+                    get_category_colors=get_category_colors
+                )
+
+            with customer_groups_tab:
+                render_customer_group_tab(
+                    filtered_df=filtered_df,
+                    aggregate_by_customer_group=aggregate_by_customer_group,
                     render_chart=render_chart,
                     get_category_colors=get_category_colors
                 )

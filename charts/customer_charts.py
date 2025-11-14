@@ -127,47 +127,46 @@ def render_customer_tab(filtered_df, aggregate_by_customer, render_chart, get_ca
             st.error(f"No customers have non-zero values for {selected_metric}.")
         else:
             st.error(f"No customers have values greater than zero for {selected_metric}.")
-    
 
-    # Display customer data table with all metrics
-    st.subheader("Customer Data Table")
 
-    # Sort by hours worked in descending order
-    sorted_customer_agg = customer_agg.sort_values("hours_used", ascending=False)
+    # Display customer data table with all metrics in an expander
+    with st.expander("Details"):
+        # Sort by hours worked in descending order
+        sorted_customer_agg = customer_agg.sort_values("hours_used", ascending=False)
 
-    # Reorder columns for better presentation - include new cost/profit columns if they exist
-    base_columns = ['Customer number', 'Customer name', 'Number of projects',
-                   'hours_used', 'hours_billable', 'Non-billable hours', 'Billability %']
-    
-    financial_columns = []
-    if 'Fee' in sorted_customer_agg.columns:
-        financial_columns.append('Fee')
-    if 'Total cost' in sorted_customer_agg.columns:
-        financial_columns.append('Total cost')
-    if 'Total profit' in sorted_customer_agg.columns:
-        financial_columns.append('Total profit')
-    if 'Profit margin %' in sorted_customer_agg.columns:
-        financial_columns.append('Profit margin %')
-    
-    rate_columns = []
-    if 'Billable rate' in sorted_customer_agg.columns:
-        rate_columns.append('Billable rate')
-    if 'Effective rate' in sorted_customer_agg.columns:
-        rate_columns.append('Effective rate')
-    
-    # Combine all columns that exist
-    display_columns = base_columns + financial_columns + rate_columns
-    existing_columns = [col for col in display_columns if col in sorted_customer_agg.columns]
-    
-    sorted_customer_agg = sorted_customer_agg[existing_columns]
+        # Reorder columns for better presentation - include new cost/profit columns if they exist
+        base_columns = ['Customer number', 'Customer name', 'Number of projects',
+                       'hours_used', 'hours_billable', 'Non-billable hours', 'Billability %']
 
-    # Use the column configuration from chart_styles
-    from utils.chart_styles import create_column_config
-    
-    # Display the table with column configurations
-    st.dataframe(
-        sorted_customer_agg,
-        use_container_width=True,
-        hide_index=True,
-        column_config=create_column_config(sorted_customer_agg)
-    )
+        financial_columns = []
+        if 'Fee' in sorted_customer_agg.columns:
+            financial_columns.append('Fee')
+        if 'Total cost' in sorted_customer_agg.columns:
+            financial_columns.append('Total cost')
+        if 'Total profit' in sorted_customer_agg.columns:
+            financial_columns.append('Total profit')
+        if 'Profit margin %' in sorted_customer_agg.columns:
+            financial_columns.append('Profit margin %')
+
+        rate_columns = []
+        if 'Billable rate' in sorted_customer_agg.columns:
+            rate_columns.append('Billable rate')
+        if 'Effective rate' in sorted_customer_agg.columns:
+            rate_columns.append('Effective rate')
+
+        # Combine all columns that exist
+        display_columns = base_columns + financial_columns + rate_columns
+        existing_columns = [col for col in display_columns if col in sorted_customer_agg.columns]
+
+        sorted_customer_agg = sorted_customer_agg[existing_columns]
+
+        # Use the column configuration from chart_styles
+        from utils.chart_styles import create_column_config
+
+        # Display the table with column configurations
+        st.dataframe(
+            sorted_customer_agg,
+            use_container_width=True,
+            hide_index=True,
+            column_config=create_column_config(sorted_customer_agg)
+        )
