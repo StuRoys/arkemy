@@ -65,13 +65,27 @@ def get_project_tag_columns_with_labels(df: pd.DataFrame, tag_mappings: Dict[str
     return result
 
 
+def calculate_profit_from_totals(total_fee: float, total_cost: float) -> float:
+    """
+    Calculate profit as the difference between total fee and total cost.
+
+    Args:
+        total_fee: Total fees earned
+        total_cost: Total costs incurred
+
+    Returns:
+        Profit (fee - cost)
+    """
+    return total_fee - total_cost
+
+
 def calculate_summary_metrics(df: pd.DataFrame) -> Dict[str, Any]:
     """
     Calculate summary metrics from the validated dataframe.
-    
+
     Args:
         df: Validated and transformed dataframe
-        
+
     Returns:
         Dictionary containing summary metrics
     """
@@ -121,13 +135,10 @@ def calculate_summary_metrics(df: pd.DataFrame) -> Dict[str, Any]:
         metrics["total_cost"] = df["cost_record"].sum()
     else:
         metrics["total_cost"] = 0
-    
-    # Profit metrics
-    if "profit_record" in df.columns:
-        metrics["total_profit"] = df["profit_record"].sum()
-    else:
-        metrics["total_profit"] = 0
-    
+
+    # Profit metrics: calculate from fee and cost totals, not from summing individual records
+    metrics["total_profit"] = calculate_profit_from_totals(metrics["total_fee"], metrics["total_cost"])
+
     # Calculate profit margin
     if metrics["total_fee"] > 0:
         metrics["profit_margin_percentage"] = (metrics["total_profit"] / metrics["total_fee"]) * 100
