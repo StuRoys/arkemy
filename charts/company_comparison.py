@@ -238,25 +238,27 @@ def render_comparison_chart(
     # Period A bar
     fig.add_trace(go.Bar(
         name='Period A',
-        x=['Period A'],
+        x=[period_a_label],
         y=[value_a],
         marker_color='#1f77b4',  # Dark blue
         text=[value_a],
         textposition='outside',
         texttemplate=text_template,
-        hovertemplate=f'<b>Period A</b><br>{period_a_label}<br>Value: %{{y:,.0f}}<extra></extra>' if selected_metric != 'profit_margin' else f'<b>Period A</b><br>{period_a_label}<br>Value: %{{y:,.1f}}%<extra></extra>'
+        hovertemplate=f'<b>{period_a_label}</b><br>Value: %{{y:,.0f}}<extra></extra>' if selected_metric != 'profit_margin' else f'<b>{period_a_label}</b><br>Value: %{{y:,.1f}}%<extra></extra>',
+        showlegend=False
     ))
 
     # Period B bar
     fig.add_trace(go.Bar(
         name='Period B',
-        x=['Period B'],
+        x=[period_b_label],
         y=[value_b],
         marker_color='#aec7e8',  # Light blue
         text=[value_b],
         textposition='outside',
         texttemplate=text_template,
-        hovertemplate=f'<b>Period B</b><br>{period_b_label}<br>Value: %{{y:,.0f}}<extra></extra>' if selected_metric != 'profit_margin' else f'<b>Period B</b><br>{period_b_label}<br>Value: %{{y:,.1f}}%<extra></extra>'
+        hovertemplate=f'<b>{period_b_label}</b><br>Value: %{{y:,.0f}}<extra></extra>' if selected_metric != 'profit_margin' else f'<b>{period_b_label}</b><br>Value: %{{y:,.1f}}%<extra></extra>',
+        showlegend=False
     ))
 
     # Add percentage change annotation above the chart (very visible)
@@ -305,7 +307,7 @@ def render_comparison_chart(
         xaxis_title="",
         yaxis_title=y_title,
         barmode='group',
-        showlegend=True,
+        showlegend=False,
         height=550,
         margin=dict(l=20, r=20, t=100, b=20),  # Increased top margin for annotations
         font=dict(size=14),
