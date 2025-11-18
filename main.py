@@ -104,30 +104,18 @@ if 'capacity_summary_df' not in st.session_state:
     st.session_state.capacity_summary_df = None
 
 # TEMP: Auto-load parquet file for testing (without user upload)
-def auto_load_parquet_for_testing():
-    """Temporary helper to auto-load parquet files from data directory for testing"""
-    data_dir = get_data_directory()
-    parquet_files = glob.glob(os.path.join(data_dir, "*.parquet"))
+from utils.test_data_loader import auto_load_test_data
 
-    if parquet_files:
-        # Load the first parquet file found
-        import pandas as pd
-        test_file = parquet_files[0]
-        try:
-            df = pd.read_parquet(test_file)
-            st.session_state.transformed_df = df[df['record_type'] == 'time_record'] if 'record_type' in df.columns else df
-            st.session_state.csv_loaded = True
-            if 'record_type' in df.columns:
-                st.session_state.transformed_planned_df = df[df['record_type'] == 'planned_record']
-                st.session_state.planned_csv_loaded = True
-            return True
-        except Exception as e:
-            print(f"Error loading test parquet: {e}")
-    return False
-
-# Auto-load for testing if data not already loaded
+data_dir = get_data_directory()
 if not st.session_state.get('csv_loaded', False):
-    auto_load_parquet_for_testing()
+    result = auto_load_test_data(data_dir)
+    if result['success'] and result['transformed_df'] is not None:
+        st.session_state.transformed_df = result['transformed_df']
+        st.session_state.csv_loaded = True
+        if result['transformed_planned_df'] is not None:
+            st.session_state.transformed_planned_df = result['transformed_planned_df']
+            st.session_state.planned_csv_loaded = True
+        print(f"[MAIN] Auto-loaded: {result['file_loaded']}")
 
 # Set up app pages
 pages = [
