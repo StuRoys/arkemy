@@ -7,14 +7,15 @@ import numpy as np
 from datetime import datetime
 
 from utils.chart_styles import (
-    create_column_config, 
-    render_chart, 
+    create_column_config,
+    render_chart,
     get_category_colors,
     get_metric_options,
     get_visualization_options,
     format_variance_columns,
     format_time_period_columns,
-    standardize_column_order
+    standardize_column_order,
+    initialize_analytics_metric_state
 )
 
 from utils.chart_helpers import (
@@ -80,18 +81,29 @@ def render_project_tab(filtered_df, aggregate_by_project, render_chart, get_cate
         planned_df = planned_df.copy()
         planned_df["project_number"] = planned_df["project_number"].astype(str)
     
+    # Initialize shared metric state (persists across tabs)
+    initialize_analytics_metric_state()
+
     # Get metric options using the new helper function
     metric_options = get_metric_options(has_planned_data)
+
+    # Get current index from session state (with fallback if metric not in options)
+    try:
+        current_metric_index = metric_options.index(st.session_state.analytics_selected_metric)
+    except ValueError:
+        current_metric_index = 0  # Fallback to first option if current selection not available
 
     col1, col2 = st.columns(2)
 
     with col1:
         selected_metric = st.selectbox(
-            "Metric",
+            label="Metric",
+            label_visibility="collapsed",
             options=metric_options,
-            index=1,  # Default to Hours worked
+            index=current_metric_index,
             key=get_widget_key("metric_selectbox")
         )
+        st.session_state.analytics_selected_metric = selected_metric
         
     
     # Set comparison view flags based on metric selection
@@ -138,15 +150,15 @@ def render_project_tab(filtered_df, aggregate_by_project, render_chart, get_cate
     with col2:
         # Get visualization options using the new helper function
         viz_options = get_visualization_options(is_comparison_view, is_forecast_hours_view)
-        default_index = 0  # Default to Monthly: Bar chart
-        
+        default_index = 0  # Default to first option
+
         # Visualization type selection
-        selected_viz_type = st.radio(
-            "Chart type",
+        selected_viz_type = st.selectbox(
+            label="Chart type",
+            label_visibility="collapsed",
             options=viz_options,
             index=default_index,
-            key=get_widget_key("viz_type_radio"),
-            horizontal=True
+            key=get_widget_key("viz_type_selectbox")
         )
         visualization_type = selected_viz_type
     
@@ -184,8 +196,8 @@ def render_project_tab(filtered_df, aggregate_by_project, render_chart, get_cate
                     monthly_data,
                     "hours_used",
                     "planned_hours",
-                    "Worked vs Planned Hours by Month",
-                    "Hours",
+                    title="",
+                    y_axis_label="Hours",
                     x_field=monthly_data["Month name"] + " " + monthly_data["Year"].astype(str)
                 )
                 
@@ -200,8 +212,8 @@ def render_project_tab(filtered_df, aggregate_by_project, render_chart, get_cate
                     monthly_data,
                     "Effective rate",
                     "planned_hourly_rate",
-                    "Worked vs Planned Hourly Rate by Month",
-                    "Rate",
+                    title="",
+                    y_axis_label="Rate",
                     x_field=monthly_data["Month name"] + " " + monthly_data["Year"].astype(str)
                 )
                 
@@ -216,8 +228,8 @@ def render_project_tab(filtered_df, aggregate_by_project, render_chart, get_cate
                     monthly_data,
                     "Fee",
                     "planned_fee",
-                    "Worked vs Planned Fees by Month",
-                    "Fee_Amount",
+                    title="",
+                    y_axis_label="Fee_Amount",
                     x_field=monthly_data["Month name"] + " " + monthly_data["Year"].astype(str)
                 )
                 
@@ -348,8 +360,8 @@ def render_project_tab(filtered_df, aggregate_by_project, render_chart, get_cate
                     filtered_project_agg,
                     "hours_used",
                     "planned_hours",
-                    "Worked vs Planned Hours by Project",
-                    "Hours"
+                    title="",
+                    y_axis_label="Hours"
                 )
                 
                 # Render the chart immediately
@@ -361,8 +373,8 @@ def render_project_tab(filtered_df, aggregate_by_project, render_chart, get_cate
                     filtered_project_agg,
                     "Effective rate",
                     "planned_hourly_rate",
-                    "Worked vs Planned Hourly Rate by Project",
-                    "Rate"
+                    title="",
+                    y_axis_label="Rate"
                 )
                 
                 # Render the chart immediately
@@ -374,8 +386,8 @@ def render_project_tab(filtered_df, aggregate_by_project, render_chart, get_cate
                     filtered_project_agg,
                     "Fee",
                     "planned_fee",
-                    "Worked vs Planned Fees by Project",
-                    "Fee_Amount"
+                    title="",
+                    y_axis_label="Fee_Amount"
                 )
                 
                 # Render the chart immediately
@@ -386,7 +398,7 @@ def render_project_tab(filtered_df, aggregate_by_project, render_chart, get_cate
                 fig = create_single_metric_chart(
                     filtered_project_agg,
                     metric_column,
-                    f"Project {selected_metric} Distribution",
+                    title="",
                     chart_type="treemap"
                 )
                 
@@ -398,7 +410,7 @@ def render_project_tab(filtered_df, aggregate_by_project, render_chart, get_cate
                 fig = create_single_metric_chart(
                     filtered_project_agg,
                     metric_column,
-                    f"{selected_metric} by Project",
+                    title="",
                     chart_type="bar",
                     sort_by=metric_column
                 )

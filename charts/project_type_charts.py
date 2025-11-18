@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from utils.chart_helpers import create_standardized_customdata
-from utils.chart_styles import get_metric_options
+from utils.chart_styles import get_metric_options, initialize_analytics_metric_state
 from utils.processors import get_project_tag_columns, aggregate_by_project_tag, get_project_tag_columns_with_labels
 from utils.tag_manager import get_tag_display_name
 
@@ -36,8 +36,17 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
     # Get available project tags with labels
     tag_columns_with_labels = get_project_tag_columns_with_labels(filtered_df, tag_mappings)
 
+    # Initialize shared metric state (persists across tabs)
+    initialize_analytics_metric_state()
+
     # Get metric options from centralized function
     metric_options = get_metric_options(has_planned_data=False)
+
+    # Get current index from session state (with fallback if metric not in options)
+    try:
+        current_metric_index = metric_options.index(st.session_state.analytics_selected_metric)
+    except ValueError:
+        current_metric_index = 0  # Fallback to first option if current selection not available
 
     # Create columns for horizontal alignment (3 columns)
     col1, col2, col3 = st.columns(3)
@@ -47,7 +56,8 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
         if len(available_tags) > 1:
             # Use column names as values, but display labels to user via format_func
             selected_tag_column = st.selectbox(
-                label="",
+                label="Tag dimension",
+                label_visibility="collapsed",
                 options=available_tags,
                 format_func=lambda col: tag_columns_with_labels.get(col, col),
                 index=0,
@@ -59,18 +69,21 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
 
     with col2:
         selected_metric = st.selectbox(
-            label="",
+            label="Metric",
+            label_visibility="collapsed",
             options=metric_options,
-            index=0,  # Default to Hours worked
+            index=current_metric_index,
             key=get_widget_key("metric_selector")
         )
+        st.session_state.analytics_selected_metric = selected_metric
 
     with col3:
         # Add visualization type selection
         visualization_options = ["Treemap", "Bar chart"]
 
         visualization_type = st.selectbox(
-            label="",
+            label="Chart type",
+            label_visibility="collapsed",
             options=visualization_options,
             index=0,  # Default to Treemap
             key=get_widget_key("visualization_selector")
@@ -104,15 +117,7 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
         filtered_project_type_agg = project_type_agg[project_type_agg[metric_column] != 0]
     else:
         filtered_project_type_agg = project_type_agg[project_type_agg[metric_column] > 0]
-    
-    # Show warning if some project types were filtered out
-    if len(filtered_project_type_agg) < len(project_type_agg):
-        excluded_count = len(project_type_agg) - len(filtered_project_type_agg)
-        if "profit" in selected_metric.lower():
-            st.warning(f"{excluded_count} project types with zero {selected_metric} were excluded from visualization.")
-        else:
-            st.warning(f"{excluded_count} project types with zero {selected_metric} were excluded from visualization.")
-    
+
     # Render visualization based on type
     if not filtered_project_type_agg.empty:
         if visualization_type == "Treemap":
@@ -197,7 +202,7 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
             )])
 
             fig.update_layout(
-                title=f"{selected_tag_display_name} {selected_metric} Distribution",
+                title="",
                 height=420,
                 margin=dict(l=20, r=20, t=40, b=20)
             )
@@ -231,7 +236,7 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
                 y=metric_column,
                 color=metric_column,
                 color_continuous_scale="Greens",
-                title=f"{selected_metric} by {selected_tag_display_name}",
+                title="",
                 custom_data=create_standardized_customdata(limited_project_types)
             )
 

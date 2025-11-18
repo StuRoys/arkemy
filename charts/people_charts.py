@@ -5,7 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.colors as pc
 from utils.chart_helpers import create_standardized_customdata, create_single_metric_chart
-from utils.chart_styles import get_metric_options
+from utils.chart_styles import get_metric_options, initialize_analytics_metric_state
 
 def render_people_tab(filtered_df, aggregate_by_person, render_chart, get_category_colors):
     """
@@ -17,32 +17,41 @@ def render_people_tab(filtered_df, aggregate_by_person, render_chart, get_catego
         render_chart: Function to render charts with consistent styling
         get_category_colors: Function to get consistent color schemes
     """
-    #st.subheader("People Analysis")
-    
+    # Initialize shared metric state (persists across tabs)
+    initialize_analytics_metric_state()
+
     # Get metric options from centralized function
     metric_options = get_metric_options(has_planned_data=False)
-    
+
+    # Get current index from session state (with fallback if metric not in options)
+    try:
+        current_metric_index = metric_options.index(st.session_state.analytics_selected_metric)
+    except ValueError:
+        current_metric_index = 0  # Fallback to first option if current selection not available
+
     # Create columns for horizontal alignment
     col1, col2 = st.columns(2)
-    
+
     with col1:
         selected_metric = st.selectbox(
-            "Select metric to visualize:",
+            label="Metric",
+            label_visibility="collapsed",
             options=metric_options,
-            index=0,  # Default to Hours worked
+            index=current_metric_index,
             key="people_metric_selector"
         )
-    
+        st.session_state.analytics_selected_metric = selected_metric
+
     with col2:
         # Add visualization type selection
         visualization_options = ["Treemap", "Bar chart"]
-        
-        visualization_type = st.radio(
-            "Visualization type:",
+
+        visualization_type = st.selectbox(
+            label="Chart type",
+            label_visibility="collapsed",
             options=visualization_options,
             index=0,  # Default to Treemap
-            key="people_visualization_selector",
-            horizontal=True
+            key="people_visualization_selector"
         )
     
     # Translate display names to column names if needed
@@ -60,15 +69,7 @@ def render_people_tab(filtered_df, aggregate_by_person, render_chart, get_catego
         filtered_person_agg = person_agg[person_agg[metric_column] != 0]
     else:
         filtered_person_agg = person_agg[person_agg[metric_column] > 0]
-    
-    # Show warning if some people were filtered out
-    if len(filtered_person_agg) < len(person_agg):
-        excluded_count = len(person_agg) - len(filtered_person_agg)
-        if "profit" in selected_metric.lower():
-            st.warning(f"{excluded_count} people with zero {selected_metric} were excluded from visualization.")
-        else:
-            st.warning(f"{excluded_count} people with zero {selected_metric} were excluded from visualization.")
-    
+
     # Render visualization based on type
     if not filtered_person_agg.empty:
         if visualization_type == "Treemap":
@@ -76,7 +77,7 @@ def render_people_tab(filtered_df, aggregate_by_person, render_chart, get_catego
             fig = create_single_metric_chart(
                 filtered_person_agg,
                 metric_column,
-                f"People {selected_metric} Distribution",
+                title="",
                 chart_type="treemap",
                 x_field="person_name"
             )
@@ -109,7 +110,7 @@ def render_people_tab(filtered_df, aggregate_by_person, render_chart, get_catego
                 y=metric_column,
                 color=metric_column,
                 color_continuous_scale="Blues",
-                title=f"{selected_metric} by Person",
+                title="",
                 custom_data=create_standardized_customdata(limited_people)
             )
 

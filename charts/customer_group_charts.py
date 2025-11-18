@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from utils.chart_helpers import create_standardized_customdata
-from utils.chart_styles import get_metric_options
+from utils.chart_styles import get_metric_options, initialize_analytics_metric_state
 
 def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_chart, get_category_colors):
     """
@@ -16,32 +16,41 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
         render_chart: Function to render charts with consistent styling
         get_category_colors: Function to get consistent color schemes
     """
-    #st.subheader("Customer Group Analysis")
+    # Initialize shared metric state (persists across tabs)
+    initialize_analytics_metric_state()
 
     # Get metric options from centralized function
     metric_options = get_metric_options(has_planned_data=False)
+
+    # Get current index from session state (with fallback if metric not in options)
+    try:
+        current_metric_index = metric_options.index(st.session_state.analytics_selected_metric)
+    except ValueError:
+        current_metric_index = 0  # Fallback to first option if current selection not available
 
     # Create columns for horizontal alignment
     col1, col2 = st.columns(2)
 
     with col1:
         selected_metric = st.selectbox(
-            "Select metric to visualize:",
+            label="Metric",
+            label_visibility="collapsed",
             options=metric_options,
-            index=0,  # Default to Hours worked
+            index=current_metric_index,
             key="customer_group_metric_selector"
         )
+        st.session_state.analytics_selected_metric = selected_metric
 
     with col2:
         # Add visualization type selection
         visualization_options = ["Treemap", "Bar chart"]
 
-        visualization_type = st.radio(
-            "Visualization type:",
+        visualization_type = st.selectbox(
+            label="Chart type",
+            label_visibility="collapsed",
             options=visualization_options,
             index=0,  # Default to Treemap
-            key="customer_group_visualization_selector",
-            horizontal=True
+            key="customer_group_visualization_selector"
         )
 
     # Translate display names to column names if needed
@@ -64,14 +73,6 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
         filtered_group_agg = customer_group_agg[customer_group_agg[metric_column] != 0]
     else:
         filtered_group_agg = customer_group_agg[customer_group_agg[metric_column] > 0]
-
-    # Show warning if some customer groups were filtered out
-    if len(filtered_group_agg) < len(customer_group_agg):
-        excluded_count = len(customer_group_agg) - len(filtered_group_agg)
-        if "profit" in selected_metric.lower():
-            st.warning(f"{excluded_count} customer groups with zero {selected_metric} were excluded from visualization.")
-        else:
-            st.warning(f"{excluded_count} customer groups with zero {selected_metric} were excluded from visualization.")
 
     # Render visualization based on type
     if not filtered_group_agg.empty:
@@ -353,7 +354,7 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                 y=metric_column,
                 color=metric_column,
                 color_continuous_scale="Blues",
-                title=f"{selected_metric} by Customer Group",
+                title="",
                 custom_data=create_standardized_customdata(limited_groups)
             )
 

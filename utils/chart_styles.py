@@ -707,6 +707,27 @@ def get_metric_options(has_planned_data=False):
         
     return metric_options
 
+def get_default_metric():
+    """
+    Get the default metric for analytics charts.
+
+    Returns:
+        str: Default metric name ("Hours worked")
+    """
+    return "Hours worked"
+
+def initialize_analytics_metric_state():
+    """
+    Initialize the shared analytics metric session state if not already set.
+    This ensures metric selection persists across different analytics tabs.
+
+    Returns:
+        str: Current selected metric from session state
+    """
+    if 'analytics_selected_metric' not in st.session_state:
+        st.session_state.analytics_selected_metric = get_default_metric()
+    return st.session_state.analytics_selected_metric
+
 def get_visualization_options(is_comparison_view=False, is_forecast_hours_view=False):
     """
     Generate visualization options based on view type.

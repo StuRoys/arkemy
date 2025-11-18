@@ -161,7 +161,7 @@ def create_standardized_customdata(df):
 
 # Replace the create_comparison_chart function in chart_helpers.py with this version
 
-def create_comparison_chart(df, primary_metric, comparison_metric, title, y_axis_label, x_field="project_name"):
+def create_comparison_chart(df, primary_metric, comparison_metric, title="", y_axis_label="", x_field="project_name"):
     """
     Creates a comparison bar chart between two metrics.
     
@@ -267,7 +267,7 @@ def create_comparison_chart(df, primary_metric, comparison_metric, title, y_axis
     
     return fig
 
-def create_single_metric_chart(df, metric, title, chart_type="bar", x_field="project_name", sort_by=None):
+def create_single_metric_chart(df, metric, title="", chart_type="bar", x_field="project_name", sort_by=None):
     """
     Creates a single metric visualization (bar chart or treemap).
     
