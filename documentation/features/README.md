@@ -17,6 +17,17 @@ This section contains comprehensive documentation for Arkemy features, including
 - You need to add new columns or metrics to Project Report
 - You want to understand the data schema compatibility
 
+### Project Snapshot
+**Directory**: [project-snapshot/](project-snapshot/)
+
+**Overview**: Quick visual comparison of project performance over time with modern, Stockpeer-inspired UI. Provides PMs with immediate insights through period-based filtering and project comparison.
+
+**When to read:**
+- You're working on the Project Snapshot page
+- You need to understand Stockpeer-inspired design patterns
+- You want to add new metrics or visualizations to the snapshot view
+- You're modifying period filtering or project comparison logic
+
 ### Tag Parsing Configuration
 **File**: [tag-parsing-config.md](tag-parsing-config.md)
 

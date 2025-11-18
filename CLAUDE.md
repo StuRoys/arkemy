@@ -128,6 +128,7 @@ The project includes comprehensive documentation in `documentation/` directory. 
 
 ### When to Check Features
 - **Working on Project Report** → [features/project-report/](documentation/features/project-report/)
+- **Working on Project Snapshot** → [features/project-snapshot/](documentation/features/project-snapshot/)
 - **Understanding tag parsing** → [features/tag-parsing-config.md](documentation/features/tag-parsing-config.md)
 - **Need data mapping** → Check relevant feature directory
 
@@ -135,6 +136,7 @@ The project includes comprehensive documentation in `documentation/` directory. 
 - **Plotly issues** → [lessons/plotly/plotly-reference.md](documentation/lessons/plotly/plotly-reference.md) - Treemaps, customdata, debugging
 - **Treemap percentages** → [lessons/plotly/treemap-percentage-implementation.md](documentation/lessons/plotly/treemap-percentage-implementation.md) - Complete percentage display guide
 - **Display labels** → [lessons/streamlit/format-func-pattern.md](documentation/lessons/streamlit/format-func-pattern.md) - format_func pattern
+- **Stockpeer patterns** → [features/project-snapshot/](documentation/features/project-snapshot/) - Dark theme, Altair charts, pills widget, asymmetric layout
 - **Main hub** → [documentation/README.md](documentation/README.md) - Navigation for all docs
 
 ## Feature Development Protocol

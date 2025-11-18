@@ -33,7 +33,8 @@ documentation/
 
 ## 🎯 Features - Feature Documentation
 
-- [Project Report - Column Mapping](features/project-report/column-mapping.md) - Data mapping between parquet schema and Project Report CSV
+- [Project Report](features/project-report/) - Period-based project analytics with actual vs planned comparisons
+- [Project Snapshot](features/project-snapshot/) - Quick visual comparison of project performance with modern Stockpeer-inspired UI
 - [Tag Parsing Configuration](features/tag-parsing-config.md) - Multiple project tag dimensions with user-friendly labels
 
 ## 🔗 Quick Reference Links
