@@ -89,6 +89,8 @@
   "planned_hourly_rate": "Planned Hourly Rate",
   "upload_project_csv": "Upload your project CSV file here",
   "select_project": "Select Project",
+  "snapshot_project": "Project snapshot",
+  "portfolio_view": "Portfolio view",
   "hours_project": "Project Hours",
   "fees_project": "Project Fees",
   "hourly_rate_project": "Project Hourly Rate",

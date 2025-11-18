@@ -4,6 +4,7 @@ import numpy as np
 import os
 import glob
 from period_translations.translations import t
+from period_charts.project_snapshot import render_project_snapshot
 from period_charts.project_hours import render_project_hours_chart
 from period_charts.project_fees import render_project_fees_chart
 from period_charts.project_rate import render_project_rate_chart
@@ -784,24 +785,34 @@ def handle_project_upload():
     # Apply sidebar filters
     filtered_df, filtered_period_info, selected_project = render_project_sidebar_filters(project_df)
     
-    # Create tabs for different views
-    hours_tab, fees_tab, rate_tab = st.tabs([
-        t("hours_project"),
-        t("fees_project"),
-        t("rate_project")
-    ])
-    
     # Get the translated "All Projects" option once
     all_projects_option = t('filter_all_projects')
-    
-    with hours_tab:
-        # Header removed - tab name already indicates content
-        render_project_hours_chart(filtered_df, selected_project, all_projects_option)
 
-    with fees_tab:
-        # Header removed - tab name already indicates content
-        render_project_fees_chart(filtered_df, selected_project, all_projects_option)
+    # Create main tabs: Project Snapshot and Portfolio View
+    snapshot_tab, portfolio_tab = st.tabs([
+        t("snapshot_project"),
+        t("portfolio_view")
+    ])
 
-    with rate_tab:
-        # Header removed - tab name already indicates content
-        render_project_rate_chart(filtered_df, selected_project, all_projects_option)
+    with snapshot_tab:
+        render_project_snapshot(filtered_df, selected_project, all_projects_option)
+
+    with portfolio_tab:
+        # Create nested tabs for portfolio analysis
+        hours_tab, fees_tab, rate_tab = st.tabs([
+            t("hours_project"),
+            t("fees_project"),
+            t("rate_project")
+        ])
+
+        with hours_tab:
+            # Header removed - tab name already indicates content
+            render_project_hours_chart(filtered_df, selected_project, all_projects_option)
+
+        with fees_tab:
+            # Header removed - tab name already indicates content
+            render_project_fees_chart(filtered_df, selected_project, all_projects_option)
+
+        with rate_tab:
+            # Header removed - tab name already indicates content
+            render_project_rate_chart(filtered_df, selected_project, all_projects_option)
