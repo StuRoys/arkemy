@@ -38,6 +38,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 5. **Handle all git commands** - user never needs to know Git
 6. **NEVER deploy without explicit permission** - see Deployment Rules below
 
+### 🚫 CRITICAL: GitHub Push Rules
+**NEVER EVER push to GitHub without explicit user consent**
+
+- User often merges to main locally for testing purposes
+- Local main branch ≠ ready to push to GitHub
+- Merging to main is for local testing workflow, NOT for publishing
+- **ONLY push to GitHub when user explicitly says:**
+  - "Push to GitHub"
+  - "Push to GH"
+  - "Sync to GitHub"
+  - "Publish to GitHub"
+  - OR explicitly approves a plan that includes pushing
+
+**What "merge to main" means:**
+- Commit changes to feature branch
+- Merge to local main branch
+- **STOP** - do NOT push
+- Wait for explicit permission to push to GitHub
+
 ### Session Start Checklist
 - [ ] Check current branch: `git rev-parse --abbrev-ref HEAD`
 - [ ] Switch to develop if not already: `git checkout develop`
