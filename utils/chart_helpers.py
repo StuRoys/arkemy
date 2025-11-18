@@ -2,6 +2,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+import plotly.colors as pc
 from datetime import datetime
 import numpy as np
 
@@ -308,20 +310,71 @@ def create_single_metric_chart(df, metric, title, chart_type="bar", x_field="pro
     
     # For treemaps
     elif chart_type == "treemap":
-        # Create custom data for treemap
-        treemap_custom_data = create_standardized_customdata(df)
-        
-        # Create the treemap
-        fig = px.treemap(
-            df,
-            path=[x_field],
-            values=metric,
-            color=metric,
-            color_continuous_scale=color_scale,
-            custom_data=treemap_custom_data,
-            title=title
+        # Build hierarchical structure for go.Treemap
+        ids = ["root"]
+        labels = ["All Items"]
+        parents = [""]
+        values_list = [0]  # Will be summed from children
+        customdata_list = [[0] * 19]  # Root customdata placeholder
+
+        # Add all items as children of root
+        root_total = 0
+        for idx, row in df.iterrows():
+            item_id = f"item_{row[x_field]}"
+            ids.append(item_id)
+            labels.append(str(row[x_field]))
+            parents.append("root")
+            val = row[metric]
+            values_list.append(val)
+            root_total += val
+
+        # Set root value to sum of children
+        values_list[0] = root_total if root_total > 0 else 1
+
+        # Build customdata for all items
+        customdata_for_root = [0] * 19
+        customdata_list = [customdata_for_root]
+
+        # Add customdata for each item
+        custom_data_arrays = create_standardized_customdata(df)
+        for i in range(len(df)):
+            row_customdata = [arr[i] if i < len(arr) else 0 for arr in custom_data_arrays]
+            customdata_list.append(row_customdata)
+
+        # Create color array using Plotly's color scale
+        min_val = df[metric].min()
+        max_val = df[metric].max()
+
+        # Normalize values for color mapping (clamp to [0, 1])
+        if max_val > min_val:
+            normalized = [max(0, min(1, (v - min_val) / (max_val - min_val))) for v in values_list]
+        else:
+            normalized = [0.5] * len(values_list)
+
+        # Sample the color scale
+        colors_scale = pc.sample_colorscale(color_scale, normalized)
+
+        # Create treemap using graph_objects
+        fig = go.Figure(data=[go.Treemap(
+            ids=ids,
+            labels=labels,
+            parents=parents,
+            values=values_list,
+            customdata=customdata_list,
+            marker=dict(
+                colors=colors_scale,
+                line=dict(width=2, color="white")
+            ),
+            textposition="middle center",
+            branchvalues="total"
+        )])
+
+        fig.update_layout(
+            title=title,
+            height=420,
+            margin=dict(l=20, r=20, t=40, b=20)
         )
-    
+
     return fig
 
 def filter_projects_by_metric(df, metric, planned_metric=None, is_comparison_view=False):
