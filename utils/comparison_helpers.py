@@ -108,6 +108,7 @@ def aggregate_period_metrics(
             - effective_rate: Total fee / total hours worked
             - billability: Billable hours % (0-100)
             - fee: Total fee/revenue
+            - cost: Total cost
             - profit: Total profit
             - profit_margin: Profit % of fee (0-100)
             - hours_used: Total hours worked
@@ -126,6 +127,7 @@ def aggregate_period_metrics(
             'effective_rate': 0.0,
             'billability': 0.0,
             'fee': 0.0,
+            'cost': 0.0,
             'profit': 0.0,
             'profit_margin': 0.0,
             'hours_used': 0.0,
@@ -138,6 +140,7 @@ def aggregate_period_metrics(
     total_hours = period_df['hours_used'].sum()
     total_billable = period_df['hours_billable'].sum()
     total_fee = period_df['fee_record'].sum()
+    total_cost = period_df['cost_record'].sum() if 'cost_record' in period_df.columns else 0.0
     total_profit = period_df['profit_record'].sum() if 'profit_record' in period_df.columns else 0.0
 
     # Calculate derived metrics with safe division
@@ -150,6 +153,7 @@ def aggregate_period_metrics(
         'effective_rate': round(effective_rate, 2),
         'billability': round(billability, 2),
         'fee': round(total_fee, 2),
+        'cost': round(total_cost, 2),
         'profit': round(total_profit, 2),
         'profit_margin': round(profit_margin, 2),
         'hours_used': round(total_hours, 2),
@@ -182,7 +186,7 @@ def calculate_comparison(
             }
         }
     """
-    metrics_to_compare = ['hours_used', 'hours_billable', 'effective_rate', 'billable_rate', 'billability', 'fee', 'profit', 'profit_margin']
+    metrics_to_compare = ['hours_used', 'hours_billable', 'effective_rate', 'billable_rate', 'billability', 'fee', 'cost', 'profit', 'profit_margin']
     comparison = {}
 
     for metric in metrics_to_compare:
@@ -379,6 +383,11 @@ def get_metric_config() -> Dict[str, Dict[str, any]]:
             'label': 'Fee',
             'unit': 'currency',
             'positive_is_good': True
+        },
+        'cost': {
+            'label': 'Cost',
+            'unit': 'currency',
+            'positive_is_good': False
         },
         'profit': {
             'label': 'Profit',

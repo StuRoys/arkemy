@@ -7,7 +7,7 @@ Provides KPI comparison across two time periods with summary cards and charts.
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Dict
 
 from utils.comparison_helpers import (
@@ -21,6 +21,7 @@ from utils.comparison_helpers import (
     get_metric_config
 )
 from utils.chart_styles import format_currency_value, get_currency_formatting
+from utils.currency_formatter import format_millions
 
 
 def format_metric_value(value: float, unit_type: str) -> str:
@@ -240,7 +241,7 @@ def render_comparison_chart(
         name='Period A',
         x=[period_a_label],
         y=[value_a],
-        marker_color='#1f77b4',  # Dark blue
+        marker_color='#4A90E2',  # Brighter blue
         text=[value_a],
         textposition='outside',
         texttemplate=text_template,
@@ -253,7 +254,7 @@ def render_comparison_chart(
         name='Period B',
         x=[period_b_label],
         y=[value_b],
-        marker_color='#aec7e8',  # Light blue
+        marker_color='#7CB5EC',  # Lighter blue
         text=[value_b],
         textposition='outside',
         texttemplate=text_template,
@@ -310,7 +311,7 @@ def render_comparison_chart(
         showlegend=False,
         height=550,
         margin=dict(l=20, r=20, t=100, b=20),  # Increased top margin for annotations
-        font=dict(size=14),
+        font=dict(size=16),
         hovermode='x unified'
     )
 
@@ -503,12 +504,21 @@ def render_comparison_tab(full_df: pd.DataFrame, filter_settings: dict = None) -
         st.session_state.comparison_type = 'Latest month vs preceding month'
     if 'comparison_selected_metric' not in st.session_state:
         st.session_state.comparison_selected_metric = 'effective_rate'
+    if 'custom_period_a_start' not in st.session_state:
+        st.session_state.custom_period_a_start = None
+    if 'custom_period_a_end' not in st.session_state:
+        st.session_state.custom_period_a_end = None
+    if 'custom_period_b_start' not in st.session_state:
+        st.session_state.custom_period_b_start = None
+    if 'custom_period_b_end' not in st.session_state:
+        st.session_state.custom_period_b_end = None
 
     # Apply non-date filters to full dataset
     filtered_df = apply_non_date_filters(full_df, filter_settings) if filter_settings else full_df.copy()
 
     # Get max date from filtered (but not by date) dataset
     max_date = filtered_df['record_date'].max().date()
+    min_date = filtered_df['record_date'].min().date()
 
     # Comparison type selector dropdown
     comparison_options = [
@@ -517,7 +527,8 @@ def render_comparison_tab(full_df: pd.DataFrame, filter_settings: dict = None) -
         'Latest 6 months vs preceding 6 months',
         'Latest 12 months vs preceding 12 months',
         'Year to date vs preceding year to date',
-        'Selected end year vs start year'
+        'Selected end year vs start year',
+        'Custom time range'
     ]
 
     # Align dropdowns horizontally
@@ -552,6 +563,49 @@ def render_comparison_tab(full_df: pd.DataFrame, filter_settings: dict = None) -
         )
         st.session_state.comparison_selected_metric = selected_metric
 
+    # Show custom date range UI if selected
+    if comparison_type == 'Custom time range':
+        st.markdown("**Custom Time Range:**")
+        custom_cols = st.columns(2)
+
+        with custom_cols[0]:
+            st.subheader("Latest Period", anchor=False, divider=False)
+            latest_start = st.date_input(
+                "Start date",
+                value=st.session_state.custom_period_a_start or max_date,
+                min_value=min_date,
+                max_value=max_date,
+                key='custom_a_start'
+            )
+            latest_end = st.date_input(
+                "End date",
+                value=st.session_state.custom_period_a_end or max_date,
+                min_value=min_date,
+                max_value=max_date,
+                key='custom_a_end'
+            )
+            st.session_state.custom_period_a_start = latest_start
+            st.session_state.custom_period_a_end = latest_end
+
+        with custom_cols[1]:
+            st.subheader("Preceding Period", anchor=False, divider=False)
+            preceding_start = st.date_input(
+                "Start date",
+                value=st.session_state.custom_period_b_start or min_date,
+                min_value=min_date,
+                max_value=max_date,
+                key='custom_b_start'
+            )
+            preceding_end = st.date_input(
+                "End date",
+                value=st.session_state.custom_period_b_end or (latest_start - timedelta(days=1) if latest_start > min_date else max_date),
+                min_value=min_date,
+                max_value=max_date,
+                key='custom_b_end'
+            )
+            st.session_state.custom_period_b_start = preceding_start
+            st.session_state.custom_period_b_end = preceding_end
+
     # Get start and end year from filter settings (if "Years" period type is selected)
     start_year = None
     end_year = None
@@ -562,13 +616,25 @@ def render_comparison_tab(full_df: pd.DataFrame, filter_settings: dict = None) -
             start_year = filter_config.get('year_start', None)
             end_year = filter_config.get('year_end', None)
 
-    # Calculate period dates using the helper function
-    period_a_start, period_a_end, period_b_start, period_b_end = calculate_period_from_comparison_type(
-        comparison_type,
-        max_date,
-        start_year,
-        end_year
-    )
+    # Calculate period dates using the helper function or custom dates
+    if comparison_type == 'Custom time range':
+        # Use custom dates from session state
+        period_a_start = st.session_state.custom_period_a_start
+        period_a_end = st.session_state.custom_period_a_end
+        period_b_start = st.session_state.custom_period_b_start
+        period_b_end = st.session_state.custom_period_b_end
+
+        # Validate custom dates are set
+        if not all([period_a_start, period_a_end, period_b_start, period_b_end]):
+            st.error("Please set all date ranges for custom comparison")
+            return
+    else:
+        period_a_start, period_a_end, period_b_start, period_b_end = calculate_period_from_comparison_type(
+            comparison_type,
+            max_date,
+            start_year,
+            end_year
+        )
 
     # Format period labels (for warnings only)
     period_a_label = format_period_label(period_a_start, period_a_end)
@@ -604,16 +670,48 @@ def render_comparison_tab(full_df: pd.DataFrame, filter_settings: dict = None) -
 
     # Optional: Show detailed numbers table
     with st.expander("📊 View Detailed Numbers"):
-        # Create comparison table
+        # Create comparison table with formatted values
         comparison_data = []
         for metric_name, metric_data in comparison.items():
             config = metric_config[metric_name]
+
+            # Format values based on unit type
+            if config['unit'] == 'currency':
+                # Use millions format for currency values
+                value_a_formatted = format_millions(metric_data['a'], decimals=1)
+                value_b_formatted = format_millions(metric_data['b'], decimals=1)
+                diff_formatted = format_millions(abs(metric_data['diff']), decimals=1)
+            elif config['unit'] == 'currency_per_hour':
+                # Format hourly rates without decimals
+                value_a_formatted = f"{metric_data['a']:,.0f}"
+                value_b_formatted = f"{metric_data['b']:,.0f}"
+                diff_formatted = f"{abs(metric_data['diff']):,.0f}"
+            elif config['unit'] == 'percentage':
+                # Format percentages - with decimals for profit_margin, without for others
+                if metric_name == 'profit_margin':
+                    value_a_formatted = f"{metric_data['a']:.1f}%"
+                    value_b_formatted = f"{metric_data['b']:.1f}%"
+                    diff_formatted = f"{abs(metric_data['diff']):.1f}%"
+                else:
+                    value_a_formatted = f"{metric_data['a']:.0f}%"
+                    value_b_formatted = f"{metric_data['b']:.0f}%"
+                    diff_formatted = f"{abs(metric_data['diff']):.0f}%"
+            elif config['unit'] == 'hours':
+                # Format hours without decimals
+                value_a_formatted = f"{metric_data['a']:,.0f}"
+                value_b_formatted = f"{metric_data['b']:,.0f}"
+                diff_formatted = f"{abs(metric_data['diff']):,.0f}"
+            else:
+                value_a_formatted = f"{metric_data['a']:,.0f}"
+                value_b_formatted = f"{metric_data['b']:,.0f}"
+                diff_formatted = f"{abs(metric_data['diff']):,.0f}"
+
             comparison_data.append({
                 'Metric': config['label'],
-                'Period A': metric_data['a'],
-                'Period B': metric_data['b'],
-                'Difference': metric_data['diff'],
-                'Change %': metric_data['pct_change']
+                period_a_label: value_a_formatted,
+                period_b_label: value_b_formatted,
+                'Difference': diff_formatted,
+                'Change %': f"{metric_data['pct_change']:.1f}%"
             })
 
         comparison_df = pd.DataFrame(comparison_data)
