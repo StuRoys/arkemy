@@ -53,7 +53,7 @@ else:
 
 # Check required columns
 project_columns = [
-    "Project ID", "Project Name", "Period", "Period Hours",
+    "Project ID", "Project Name", "Period", "Period Hours", "Billable Hours",
     "Planned Hours", "Period Fees Adjusted", "Planned Income"
 ]
 

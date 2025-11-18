@@ -129,6 +129,7 @@ def transform_parquet_to_project_report(parquet_path):
             'project_number': 'Project ID',
             'project_name': 'Project Name',
             'hours_used': 'Period Hours',
+            'hours_billable': 'Billable Hours',
             'planned_hours': 'Planned Hours',
             'fee_record': 'Period Fees Adjusted',  # Charts expect "Period Fees Adjusted"
             'planned_fee': 'Planned Income'
@@ -139,7 +140,7 @@ def transform_parquet_to_project_report(parquet_path):
         project_report_df = project_report_df.rename(columns=existing_mapping)
 
         # Select only the columns Project Report expects
-        expected_columns = ['Project ID', 'Project Name', 'Period', 'Period Hours', 'Planned Hours', 'Period Fees Adjusted', 'Planned Income']
+        expected_columns = ['Project ID', 'Project Name', 'Period', 'Period Hours', 'Billable Hours', 'Planned Hours', 'Period Fees Adjusted', 'Planned Income']
 
         # Fill missing columns with 0 or appropriate defaults
         for col in expected_columns:
