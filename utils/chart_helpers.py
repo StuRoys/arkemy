@@ -338,7 +338,7 @@ def create_single_metric_chart(df, metric, title, chart_type="bar", x_field="pro
         # Add customdata for each item
         custom_data_arrays = create_standardized_customdata(df)
         for i in range(len(df)):
-            row_customdata = [arr[i] if i < len(arr) else 0 for arr in custom_data_arrays]
+            row_customdata = [arr.iloc[i] if i < len(arr) else 0 for arr in custom_data_arrays]
             customdata_list.append(row_customdata)
 
         # Create color array using Plotly's color scale

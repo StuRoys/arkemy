@@ -102,7 +102,7 @@ def render_phase_tab(filtered_df, aggregate_by_phase, render_chart, get_category
                 # Add customdata for each phase
                 custom_data_arrays = create_standardized_customdata(filtered_phase_agg)
                 for i in range(len(filtered_phase_agg)):
-                    row_customdata = [arr[i] if i < len(arr) else 0 for arr in custom_data_arrays]
+                    row_customdata = [arr.iloc[i] if i < len(arr) else 0 for arr in custom_data_arrays]
                     customdata_list.append(row_customdata)
 
                 # Create color array using Plotly's color scale

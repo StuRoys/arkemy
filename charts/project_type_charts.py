@@ -139,7 +139,7 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
             # Add customdata for each tag
             custom_data_arrays = create_standardized_customdata(filtered_project_type_agg)
             for i in range(len(filtered_project_type_agg)):
-                row_customdata = [arr[i] if i < len(arr) else 0 for arr in custom_data_arrays]
+                row_customdata = [arr.iloc[i] if i < len(arr) else 0 for arr in custom_data_arrays]
                 customdata_list.append(row_customdata)
 
             # Create color array using Plotly's color scale

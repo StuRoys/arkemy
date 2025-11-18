@@ -100,7 +100,7 @@ def render_people_tab(filtered_df, aggregate_by_person, render_chart, get_catego
             # Add customdata for each person
             custom_data_arrays = create_standardized_customdata(filtered_person_agg)
             for i in range(len(filtered_person_agg)):
-                row_customdata = [arr[i] if i < len(arr) else 0 for arr in custom_data_arrays]
+                row_customdata = [arr.iloc[i] if i < len(arr) else 0 for arr in custom_data_arrays]
                 customdata_list.append(row_customdata)
 
             # Create color array using Plotly's color scale

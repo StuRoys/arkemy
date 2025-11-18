@@ -100,7 +100,7 @@ def render_customer_tab(filtered_df, aggregate_by_customer, render_chart, get_ca
             # Add customdata for each customer
             custom_data_arrays = create_standardized_customdata(filtered_customer_agg)
             for i in range(len(filtered_customer_agg)):
-                row_customdata = [arr[i] if i < len(arr) else 0 for arr in custom_data_arrays]
+                row_customdata = [arr.iloc[i] if i < len(arr) else 0 for arr in custom_data_arrays]
                 customdata_list.append(row_customdata)
 
             # Create color array using Plotly's color scale
