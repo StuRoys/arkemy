@@ -108,6 +108,7 @@ pages = [
     st.Page("pages/1_Analytics_Dashboard.py", title="Analytics Dashboard", icon="📊"),
     st.Page("pages/2_Coworker_Report.py", title="Coworker Report", icon="👥"),
     st.Page("pages/3_Project_Report.py", title="Project Report", icon="📁"),
+    st.Page("pages/6_Project_Snapshot.py", title="Project Snapshot", icon="🔍"),
     st.Page("pages/4_Hrs_SQM_Phase.py", title="Hrs/m2/phase (beta)", icon="🏗️"),
     st.Page("pages/5_Admin.py", title="Admin", icon="🛠️")
 ]
