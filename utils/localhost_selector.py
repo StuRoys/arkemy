@@ -105,7 +105,7 @@ def render_localhost_file_selector(
         clients = get_client_directories()
 
         if not clients:
-            st.sidebar.info("No client directories found in /data")
+            st.info("No client directories found in /data")
             return None, None
 
         # Client selector with placeholder
@@ -117,7 +117,7 @@ def render_localhost_file_selector(
         else:
             client_index = 0  # Placeholder
 
-        selected_client_display = st.sidebar.selectbox(
+        selected_client_display = st.selectbox(
             "Select Client",
             options=client_options,
             index=client_index,
@@ -140,7 +140,7 @@ def render_localhost_file_selector(
 
         if not files:
             ext_display = ", ".join(file_extensions)
-            st.sidebar.info(f"No {ext_display} files in this client directory")
+            st.info(f"No {ext_display} files in this client directory")
             return selected_client_display, None
 
         # Build file options with placeholder
@@ -161,7 +161,7 @@ def render_localhost_file_selector(
         else:
             file_index = 0  # Placeholder
 
-        selected_file_display = st.sidebar.selectbox(
+        selected_file_display = st.selectbox(
             "Select File",
             options=file_display_options,
             index=file_index,
