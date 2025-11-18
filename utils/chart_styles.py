@@ -7,6 +7,15 @@ import pandas as pd
 # Import directly from currency_formatter instead of number_formatter
 from utils.currency_formatter import get_currency_code, get_currency_display_name, CURRENCY_SYMBOLS, SYMBOL_POSITIONS
 
+# Metrics that represent sum operations (for percentage calculations)
+SUM_METRICS = [
+    "hours_used",
+    "hours_billable",
+    "Fee",
+    "Total cost",
+    "Total profit"
+]
+
 # Distinct colors for treemap categories
 CATEGORY_COLORS = {
     "customer": ["#1f77b4", "#aec7e8", "#3366cc", "#0099c6", "#6699cc", "#004488"],

@@ -6,6 +6,28 @@ import plotly.graph_objects as go
 import plotly.colors as pc
 from datetime import datetime
 import numpy as np
+from utils.chart_styles import SUM_METRICS
+
+
+def build_treemap_texttemplate(metric, has_percentage_column):
+    """
+    Build the texttemplate for treemap tiles based on whether percentage data exists.
+
+    Args:
+        metric: Name of the metric being visualized
+        has_percentage_column: Boolean indicating if percentage column exists for this metric
+
+    Returns:
+        Text template string for treemap tiles
+    """
+    if has_percentage_column:
+        # Show label + percentage on separate line, 1 decimal place
+        # customdata[19] is the percentage column index (added at the end)
+        return '%{label}<br>%{customdata[19]:.1f}%'
+    else:
+        # Default: just show label
+        return '%{label}'
+
 
 def create_standardized_customdata(df):
     """
@@ -129,7 +151,12 @@ def create_standardized_customdata(df):
         custom_data.append(df["Profit margin %"])
     else:
         custom_data.append([0] * len(df))
-    
+
+    # [19] Percentage column (dynamically determined)
+    # This will be populated by the caller if a percentage column exists
+    # For now, add a placeholder that the treemap logic will replace
+    custom_data.append([0] * len(df))
+
     return custom_data
 
 # Replace the create_comparison_chart function in chart_helpers.py with this version
@@ -315,7 +342,11 @@ def create_single_metric_chart(df, metric, title, chart_type="bar", x_field="pro
         labels = ["All Items"]
         parents = [""]
         values_list = [0]  # Will be summed from children
-        customdata_list = [[0] * 19]  # Root customdata placeholder
+        customdata_list = [[0] * 20]  # Root customdata placeholder (19 + percentage)
+
+        # Check if percentage column exists for this metric
+        pct_column = f'{metric}_pct'
+        has_percentage = pct_column in df.columns
 
         # Add all items as children of root
         root_total = 0
@@ -332,7 +363,7 @@ def create_single_metric_chart(df, metric, title, chart_type="bar", x_field="pro
         values_list[0] = root_total if root_total > 0 else 1
 
         # Build customdata for all items
-        customdata_for_root = [0] * 19
+        customdata_for_root = [0] * 20
         customdata_list = [customdata_for_root]
 
         # Add customdata for each item
@@ -348,6 +379,12 @@ def create_single_metric_chart(df, metric, title, chart_type="bar", x_field="pro
                     row_customdata.append(0)
             customdata_list.append(row_customdata)
 
+        # Add percentage values if they exist (index [19])
+        if has_percentage:
+            for i, pct_val in enumerate(df[pct_column], 1):  # Start from 1 to skip root
+                if i < len(customdata_list):
+                    customdata_list[i][19] = pct_val
+
         # Create color array using Plotly's color scale
         min_val = df[metric].min()
         max_val = df[metric].max()
@@ -361,6 +398,9 @@ def create_single_metric_chart(df, metric, title, chart_type="bar", x_field="pro
         # Sample the color scale
         colors_scale = pc.sample_colorscale(color_scale, normalized)
 
+        # Build text template based on percentage availability
+        texttemplate = build_treemap_texttemplate(metric, has_percentage)
+
         # Create treemap using graph_objects
         fig = go.Figure(data=[go.Treemap(
             ids=ids,
@@ -368,6 +408,7 @@ def create_single_metric_chart(df, metric, title, chart_type="bar", x_field="pro
             parents=parents,
             values=values_list,
             customdata=customdata_list,
+            texttemplate=texttemplate,
             marker=dict(
                 colors=colors_scale,
                 line=dict(width=2, color="white")

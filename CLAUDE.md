@@ -93,8 +93,30 @@ Before ANY Railway deployment:
 - **Avoid phrases like "Perfect!", "Great!", "🚀" or similar excitement**
 - **Focus on technical facts and what was accomplished**
 
-## Technical References
-- **[plotly.md](plotly.md)** - Plotly visualization insights, especially treemap behavior and `branchvalues="total"` parameter requirements
+## 📚 Knowledge Base - Implementation Guidance
+
+The project includes comprehensive documentation in `documentation/` directory. **Consult conditionally when relevant:**
+
+### When to Check Lessons (Implementation Patterns)
+- **Building/debugging treemaps** → [lessons/plotly/](documentation/lessons/plotly/)
+- **Working with Streamlit widgets** → [lessons/streamlit/](documentation/lessons/streamlit/)
+- **Learning reusable patterns** → Check the relevant framework directory
+
+### When to Check Architecture
+- **Understanding system design** → [architecture/schema-system.md](documentation/architecture/schema-system.md)
+- **Adding new features** → Review how current features are built
+- **Modifying data handling** → Check architecture docs first
+
+### When to Check Features
+- **Working on Project Report** → [features/project-report/](documentation/features/project-report/)
+- **Understanding tag parsing** → [features/tag-parsing-config.md](documentation/features/tag-parsing-config.md)
+- **Need data mapping** → Check relevant feature directory
+
+### Quick Reference
+- **Plotly issues** → [lessons/plotly/plotly-reference.md](documentation/lessons/plotly/plotly-reference.md) - Treemaps, customdata, debugging
+- **Treemap percentages** → [lessons/plotly/treemap-percentage-implementation.md](documentation/lessons/plotly/treemap-percentage-implementation.md) - Complete percentage display guide
+- **Display labels** → [lessons/streamlit/format-func-pattern.md](documentation/lessons/streamlit/format-func-pattern.md) - format_func pattern
+- **Main hub** → [documentation/README.md](documentation/README.md) - Navigation for all docs
 
 ## Feature Development Protocol
 **CRITICAL: DO NOT claim features are "solved" or "complete" without explicit user confirmation**

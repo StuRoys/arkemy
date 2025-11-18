@@ -4,6 +4,37 @@ import numpy as np
 import re
 from typing import Dict, List, Tuple, Any, Optional
 from utils.tag_manager import get_tag_display_name
+from utils.chart_styles import SUM_METRICS
+
+
+def add_percentage_columns(df: pd.DataFrame, sum_metrics: List[str]) -> pd.DataFrame:
+    """
+    Add percentage columns for sum metrics.
+
+    For each metric in sum_metrics, creates a new column with '_pct' suffix
+    containing the percentage of that metric relative to its total.
+
+    Args:
+        df: DataFrame to add percentage columns to
+        sum_metrics: List of column names to calculate percentages for
+
+    Returns:
+        DataFrame with new percentage columns added
+    """
+    # Make a copy to avoid modifying the original
+    result_df = df.copy()
+
+    # For each sum metric, calculate its percentage of the total
+    for metric in sum_metrics:
+        if metric in result_df.columns:
+            total = result_df[metric].sum()
+            if total > 0:
+                result_df[f'{metric}_pct'] = (result_df[metric] / total) * 100
+            else:
+                # Handle edge case where total is 0
+                result_df[f'{metric}_pct'] = 0
+
+    return result_df
 
 
 def get_project_tag_columns(df: pd.DataFrame) -> list:
@@ -393,6 +424,9 @@ def aggregate_by_customer(df: pd.DataFrame) -> pd.DataFrame:
         "customer_name": "Customer name"
     }, inplace=True)
 
+    # Add percentage columns for sum metrics
+    customer_agg = add_percentage_columns(customer_agg, SUM_METRICS)
+
     return customer_agg
 
 
@@ -461,6 +495,9 @@ def aggregate_by_customer_group(df: pd.DataFrame) -> pd.DataFrame:
     customer_group_agg["Profit margin %"] = 0.0
     mask = customer_group_agg["Fee"] > 0
     customer_group_agg.loc[mask, "Profit margin %"] = (customer_group_agg.loc[mask, "Total profit"] / customer_group_agg.loc[mask, "Fee"] * 100).round(2)
+
+    # Add percentage columns for sum metrics
+    customer_group_agg = add_percentage_columns(customer_group_agg, SUM_METRICS)
 
     return customer_group_agg
 
@@ -537,7 +574,10 @@ def aggregate_by_project(df: pd.DataFrame) -> pd.DataFrame:
     project_agg["Profit margin %"] = 0.0
     mask = project_agg["Fee"] > 0
     project_agg.loc[mask, "Profit margin %"] = (project_agg.loc[mask, "Total profit"] / project_agg.loc[mask, "Fee"] * 100).round(2)
-    
+
+    # Add percentage columns for sum metrics
+    project_agg = add_percentage_columns(project_agg, SUM_METRICS)
+
     return project_agg
 
 
@@ -610,6 +650,9 @@ def aggregate_by_project_tag(df: pd.DataFrame, tag_column: str = "project_tag") 
     project_tag_agg["Profit margin %"] = 0.0
     mask = project_tag_agg["Fee"] > 0
     project_tag_agg.loc[mask, "Profit margin %"] = (project_tag_agg.loc[mask, "Total profit"] / project_tag_agg.loc[mask, "Fee"] * 100).round(2)
+
+    # Add percentage columns for sum metrics
+    project_tag_agg = add_percentage_columns(project_tag_agg, SUM_METRICS)
 
     return project_tag_agg
 
@@ -686,7 +729,10 @@ def aggregate_by_phase(df: pd.DataFrame) -> pd.DataFrame:
     phase_agg["Profit margin %"] = 0.0
     mask = phase_agg["Fee"] > 0
     phase_agg.loc[mask, "Profit margin %"] = (phase_agg.loc[mask, "Total profit"] / phase_agg.loc[mask, "Fee"] * 100).round(2)
-    
+
+    # Add percentage columns for sum metrics
+    phase_agg = add_percentage_columns(phase_agg, SUM_METRICS)
+
     return phase_agg
 
 def aggregate_by_price_model(df: pd.DataFrame) -> pd.DataFrame:
@@ -753,7 +799,10 @@ def aggregate_by_price_model(df: pd.DataFrame) -> pd.DataFrame:
     price_model_agg["Profit margin %"] = 0.0
     mask = price_model_agg["Fee"] > 0
     price_model_agg.loc[mask, "Profit margin %"] = (price_model_agg.loc[mask, "Total profit"] / price_model_agg.loc[mask, "Fee"] * 100).round(2)
-    
+
+    # Add percentage columns for sum metrics
+    price_model_agg = add_percentage_columns(price_model_agg, SUM_METRICS)
+
     return price_model_agg
 
 
@@ -821,7 +870,10 @@ def aggregate_by_activity(df: pd.DataFrame) -> pd.DataFrame:
     activity_agg["Profit margin %"] = 0.0
     mask = activity_agg["Fee"] > 0
     activity_agg.loc[mask, "Profit margin %"] = (activity_agg.loc[mask, "Total profit"] / activity_agg.loc[mask, "Fee"] * 100).round(2)
-    
+
+    # Add percentage columns for sum metrics
+    activity_agg = add_percentage_columns(activity_agg, SUM_METRICS)
+
     return activity_agg
 
 
@@ -885,7 +937,10 @@ def aggregate_by_person(df: pd.DataFrame) -> pd.DataFrame:
     person_agg["Profit margin %"] = 0.0
     mask = person_agg["Fee"] > 0
     person_agg.loc[mask, "Profit margin %"] = (person_agg.loc[mask, "Total profit"] / person_agg.loc[mask, "Fee"] * 100).round(2)
-    
+
+    # Add percentage columns for sum metrics
+    person_agg = add_percentage_columns(person_agg, SUM_METRICS)
+
     return person_agg
 
 
@@ -1130,7 +1185,10 @@ def aggregate_by_month_year(df: pd.DataFrame) -> pd.DataFrame:
     month_year_agg["Profit margin %"] = 0.0
     mask = month_year_agg["Fee"] > 0
     month_year_agg.loc[mask, "Profit margin %"] = (month_year_agg.loc[mask, "Total profit"] / month_year_agg.loc[mask, "Fee"] * 100).round(2)
-    
+
+    # Add percentage columns for sum metrics
+    month_year_agg = add_percentage_columns(month_year_agg, SUM_METRICS)
+
     return month_year_agg
 
 def aggregate_customer_project_hierarchy(df: pd.DataFrame) -> pd.DataFrame:

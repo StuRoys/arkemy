@@ -82,6 +82,11 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
     # Aggregate by selected project tag - this will be used for all visualizations
     project_type_agg = aggregate_by_project_tag(filtered_df, tag_column=selected_tag_column)
 
+    # Add percentage columns for sum metrics (for treemap display)
+    from utils.chart_styles import SUM_METRICS
+    from utils.processors import add_percentage_columns
+    project_type_agg = add_percentage_columns(project_type_agg, SUM_METRICS)
+
     # Check if we have any data after aggregation
     if project_type_agg.empty:
         st.error("No project type data available after filtering.")
@@ -133,7 +138,7 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
             values_list[0] = root_total if root_total > 0 else 1
 
             # Build customdata for all items (root + tags)
-            customdata_for_root = [0] * 19
+            customdata_for_root = [0] * 20
             customdata_list = [customdata_for_root]
 
             # Add customdata for each tag
@@ -147,6 +152,13 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
                     else:
                         row_customdata.append(0)
                 customdata_list.append(row_customdata)
+
+            # Add percentage values if they exist (index [19])
+            pct_column = f'{metric_column}_pct'
+            if pct_column in filtered_project_type_agg.columns:
+                for i, pct_val in enumerate(filtered_project_type_agg[pct_column], 1):  # Start from 1 to skip root
+                    if i < len(customdata_list):
+                        customdata_list[i][19] = pct_val
 
             # Create color array using Plotly's color scale
             import plotly.colors as pc
@@ -162,6 +174,12 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
             # Get Greens color scale
             colors_scale = pc.sample_colorscale("Greens", normalized)
 
+            # Build text template based on whether percentage exists
+            from utils.chart_helpers import build_treemap_texttemplate
+            pct_column = f'{metric_column}_pct'
+            has_percentage = pct_column in filtered_project_type_agg.columns
+            texttemplate = build_treemap_texttemplate(metric_column, has_percentage)
+
             # Create treemap using graph_objects
             fig = go.Figure(data=[go.Treemap(
                 ids=ids,
@@ -169,6 +187,7 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
                 parents=parents,
                 values=values_list,
                 customdata=customdata_list,
+                texttemplate=texttemplate,  # Show percentages on tiles for sum metrics
                 marker=dict(
                     colors=colors_scale,
                     line=dict(width=2, color="white")
