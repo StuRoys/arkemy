@@ -73,12 +73,11 @@ def render_all_projects_snapshot(df):
             "All": "all"
         }
 
-        # Create radio buttons for period selection
-        selected_period_key = st.radio(
-            "Select time period",
+        # Create pill buttons for period selection (Stockpeer-style)
+        selected_period_key = st.pills(
+            "Period",
             options=list(period_options.keys()),
-            index=3,  # Default to 1Y
-            horizontal=True,
+            default="1Y",
             label_visibility="collapsed"
         )
 
