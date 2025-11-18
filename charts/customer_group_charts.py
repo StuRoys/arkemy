@@ -186,8 +186,8 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
             # Strategy: Build a map of id -> customdata, then construct final list in id order
             customdata_map = {}
 
-            # ROOT customdata
-            customdata_map["ROOT"] = [0] * 19
+            # ROOT customdata (20 elements to match treemap texttemplate)
+            customdata_map["ROOT"] = [0] * 20
 
             # Group customdata (calculate for each group)
             for group_name in group_ids.keys():
@@ -208,7 +208,8 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                     0, 0, 0, 0, 0, 0, 0, 0, 0,
                     gm["Total cost"],
                     gm["Total profit"],
-                    profit_margin
+                    profit_margin,
+                    0  # [19] percentage (placeholder for group level)
                 ]
                 customdata_map[group_ids[group_name]] = group_customdata
 

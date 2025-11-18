@@ -153,6 +153,13 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
                         row_customdata.append(0)
                 customdata_list.append(row_customdata)
 
+            # Add percentage values if they exist (index [19])
+            pct_column = f'{metric_column}_pct'
+            if pct_column in filtered_project_type_agg.columns:
+                for i, pct_val in enumerate(filtered_project_type_agg[pct_column], 1):  # Start from 1 to skip root
+                    if i < len(customdata_list):
+                        customdata_list[i][19] = pct_val
+
             # Create color array using Plotly's color scale
             import plotly.colors as pc
             min_val = filtered_project_type_agg[metric_column].min()
