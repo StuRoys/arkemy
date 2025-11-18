@@ -112,11 +112,7 @@ def render_all_projects_snapshot(df):
                 alt.X("Period:T", title="Period", axis=alt.Axis(format="%b %Y")),
                 alt.Y("Period Hours:Q", title="Hours Worked", scale=alt.Scale(zero=False)),
                 alt.Color("Project Name:N", title="Project"),
-                alt.Tooltip([
-                    alt.Tooltip("Period:T", title="Period", format="%b %Y"),
-                    alt.Tooltip("Project Name:N", title="Project"),
-                    alt.Tooltip("Period Hours:Q", title="Hours", format=",.0f")
-                ])
+                tooltip=["Period:T", "Project Name:N", "Period Hours:Q"]
             )
             .properties(
                 height=400,
