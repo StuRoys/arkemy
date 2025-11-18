@@ -101,82 +101,80 @@ def render_localhost_file_selector(
     if file_key not in st.session_state:
         st.session_state[file_key] = None
 
-    st.sidebar.markdown("---")
-    st.sidebar.markdown(f"### {title}")
+    with st.sidebar.expander("Select dataset"):
+        clients = get_client_directories()
 
-    clients = get_client_directories()
+        if not clients:
+            st.sidebar.info("No client directories found in /data")
+            return None, None
 
-    if not clients:
-        st.sidebar.info("No client directories found in /data")
-        return None, None
+        # Client selector with placeholder
+        client_options = [CLIENT_PLACEHOLDER] + clients
 
-    # Client selector with placeholder
-    client_options = [CLIENT_PLACEHOLDER] + clients
+        # Determine current client index
+        if st.session_state[client_key] and st.session_state[client_key] in clients:
+            client_index = client_options.index(st.session_state[client_key])
+        else:
+            client_index = 0  # Placeholder
 
-    # Determine current client index
-    if st.session_state[client_key] and st.session_state[client_key] in clients:
-        client_index = client_options.index(st.session_state[client_key])
-    else:
-        client_index = 0  # Placeholder
+        selected_client_display = st.sidebar.selectbox(
+            "Select Client",
+            options=client_options,
+            index=client_index,
+            key=f"{session_prefix}client_selector"
+        )
 
-    selected_client_display = st.sidebar.selectbox(
-        "Select Client",
-        options=client_options,
-        index=client_index,
-        key=f"{session_prefix}client_selector"
-    )
+        # Check if placeholder selected
+        if selected_client_display == CLIENT_PLACEHOLDER:
+            st.session_state[client_key] = None
+            st.session_state[file_key] = None
+            return None, None
 
-    # Check if placeholder selected
-    if selected_client_display == CLIENT_PLACEHOLDER:
-        st.session_state[client_key] = None
-        st.session_state[file_key] = None
-        return None, None
+        # Client changed - reset file selection
+        if selected_client_display != st.session_state[client_key]:
+            st.session_state[client_key] = selected_client_display
+            st.session_state[file_key] = None
 
-    # Client changed - reset file selection
-    if selected_client_display != st.session_state[client_key]:
-        st.session_state[client_key] = selected_client_display
-        st.session_state[file_key] = None
+        # File selector
+        files = get_files_in_client(selected_client_display, file_extensions)
 
-    # File selector
-    files = get_files_in_client(selected_client_display, file_extensions)
+        if not files:
+            ext_display = ", ".join(file_extensions)
+            st.sidebar.info(f"No {ext_display} files in this client directory")
+            return selected_client_display, None
 
-    if not files:
-        ext_display = ", ".join(file_extensions)
-        st.sidebar.info(f"No {ext_display} files in this client directory")
-        return selected_client_display, None
+        # Build file options with placeholder
+        file_options_map = {f"{f['name']} ({f['size_mb']} MB)": f['path'] for f in files}
+        file_display_options = [FILE_PLACEHOLDER] + list(file_options_map.keys())
 
-    # Build file options with placeholder
-    file_options_map = {f"{f['name']} ({f['size_mb']} MB)": f['path'] for f in files}
-    file_display_options = [FILE_PLACEHOLDER] + list(file_options_map.keys())
+        # Determine current file index
+        current_file_display = None
+        if st.session_state[file_key]:
+            # Find the display name for the currently selected file path
+            for display_name, path in file_options_map.items():
+                if path == st.session_state[file_key]:
+                    current_file_display = display_name
+                    break
 
-    # Determine current file index
-    current_file_display = None
-    if st.session_state[file_key]:
-        # Find the display name for the currently selected file path
-        for display_name, path in file_options_map.items():
-            if path == st.session_state[file_key]:
-                current_file_display = display_name
-                break
+        if current_file_display and current_file_display in file_display_options:
+            file_index = file_display_options.index(current_file_display)
+        else:
+            file_index = 0  # Placeholder
 
-    if current_file_display and current_file_display in file_display_options:
-        file_index = file_display_options.index(current_file_display)
-    else:
-        file_index = 0  # Placeholder
+        selected_file_display = st.sidebar.selectbox(
+            "Select File",
+            options=file_display_options,
+            index=file_index,
+            key=f"{session_prefix}file_selector_{selected_client_display}"
+        )
 
-    selected_file_display = st.sidebar.selectbox(
-        "Select File",
-        options=file_display_options,
-        index=file_index,
-        key=f"{session_prefix}file_selector_{selected_client_display}"
-    )
+        # Check if placeholder selected
+        if selected_file_display == FILE_PLACEHOLDER:
+            st.session_state[file_key] = None
+            return selected_client_display, None
 
-    # Check if placeholder selected
-    if selected_file_display == FILE_PLACEHOLDER:
-        st.session_state[file_key] = None
-        return selected_client_display, None
+        # Get actual file path
+        selected_file_path = file_options_map[selected_file_display]
+        st.session_state[file_key] = selected_file_path
 
-    # Get actual file path
-    selected_file_path = file_options_map[selected_file_display]
-    st.session_state[file_key] = selected_file_path
-
-    return selected_client_display, selected_file_path
+        return selected_client_display, selected_file_path
