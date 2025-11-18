@@ -328,7 +328,7 @@ def render_comparison_tab(filtered_df: pd.DataFrame, filter_settings: dict = Non
     """
     # Initialize session state keys if not present
     if 'comparison_type' not in st.session_state:
-        st.session_state.comparison_type = 'Last 6 months vs previous 6 months'
+        st.session_state.comparison_type = 'Latest 6 months vs previous 6 months'
     if 'comparison_selected_metric' not in st.session_state:
         st.session_state.comparison_selected_metric = 'effective_rate'
 
@@ -337,10 +337,10 @@ def render_comparison_tab(filtered_df: pd.DataFrame, filter_settings: dict = Non
 
     # Comparison type selector dropdown
     comparison_options = [
-        'Last month vs previous month',
-        'Last quarter vs previous quarter',
-        'Last 6 months vs previous 6 months',
-        'Last 12 months vs previous 12 months',
+        'Latest month vs previous month',
+        'Latest quarter vs previous quarter',
+        'Latest 6 months vs previous 6 months',
+        'Latest 12 months vs previous 12 months',
         'Year to date vs previous year to date',
         'Selected end year vs start year'
     ]

@@ -295,16 +295,16 @@ def calculate_period_from_comparison_type(
     if isinstance(max_date, pd.Timestamp):
         max_date = max_date.date()
 
-    if comparison_type == "Last month vs previous month":
+    if comparison_type == "Latest month vs previous month":
         return calculate_period_dates(max_date, 1, 'period')
 
-    elif comparison_type == "Last quarter vs previous quarter":
+    elif comparison_type == "Latest quarter vs previous quarter":
         return calculate_period_dates(max_date, 3, 'period')
 
-    elif comparison_type == "Last 6 months vs previous 6 months":
+    elif comparison_type == "Latest 6 months vs previous 6 months":
         return calculate_period_dates(max_date, 6, 'period')
 
-    elif comparison_type == "Last 12 months vs previous 12 months":
+    elif comparison_type == "Latest 12 months vs previous 12 months":
         return calculate_period_dates(max_date, 12, 'period')
 
     elif comparison_type == "Year to date vs previous year to date":
