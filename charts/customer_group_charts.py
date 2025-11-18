@@ -122,6 +122,11 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
             mask = customer_level_data["Fee"] > 0
             customer_level_data.loc[mask, "Profit margin %"] = (customer_level_data.loc[mask, "Total profit"] / customer_level_data.loc[mask, "Fee"] * 100).round(2)
 
+            # Add percentage columns for sum metrics at customer level
+            from utils.chart_styles import SUM_METRICS
+            from utils.processors import add_percentage_columns
+            customer_level_data = add_percentage_columns(customer_level_data, SUM_METRICS)
+
             # Build treemap data structure with proper ids, labels, parents, values, AND customdata
             # Start with ROOT node to enable proper depth control
             ids = ["ROOT"]
@@ -215,6 +220,9 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                 customer = row["customer_name"]
                 customer_id = f"customer_{group}_{customer}"
 
+                # Get percentage if it exists, otherwise 0
+                pct_value = row.get(f'{metric_column}_pct', 0) if f'{metric_column}_pct' in customer_level_data.columns else 0
+
                 customer_customdata_map[customer_id] = [
                     row["hours_used"],              # [0]
                     row["hours_billable"],          # [1]
@@ -226,13 +234,14 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                     0, 0, 0, 0, 0, 0, 0, 0, 0,     # [7-15] planned/variance (not used)
                     row["Total cost"],              # [16]
                     row["Total profit"],            # [17]
-                    row["Profit margin %"]          # [18]
+                    row["Profit margin %"],         # [18]
+                    pct_value                       # [19] percentage for treemap display
                 ]
 
             customdata_map.update(customer_customdata_map)
 
             # Build final_customdata in the exact same order as ids list
-            final_customdata = [customdata_map.get(id_, [0]*19) for id_ in ids]
+            final_customdata = [customdata_map.get(id_, [0]*20) for id_ in ids]
 
             # Update group values in the values list
             for i, id_ in enumerate(ids):
@@ -275,6 +284,12 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
             colors_list = [color_map.get(id_, "lightgray") for id_ in ids]
 
             # Create hierarchical treemap using graph_objects with discrete colors
+            # Build text template based on whether percentage exists
+            from utils.chart_helpers import build_treemap_texttemplate
+            pct_column = f'{metric_column}_pct'
+            has_percentage = pct_column in customer_level_data.columns
+            texttemplate = build_treemap_texttemplate(metric_column, has_percentage)
+
             # Let apply_chart_style() handle marker styling (cornerradius, padding)
             fig = go.Figure(data=[go.Treemap(
                 ids=ids,
@@ -283,6 +298,7 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                 values=values,
                 branchvalues="total",  # Calculate parent values from children
                 customdata=final_customdata,  # Add full customdata for hover templates
+                texttemplate=texttemplate,  # Show percentages on tiles for sum metrics
                 marker=dict(
                     colors=colors_list,  # Discrete colors per tile
                     line=dict(width=2, color="white")  # White borders for separation

@@ -74,77 +74,14 @@ def render_activity_tab(filtered_df, aggregate_by_activity, render_chart, get_ca
         # Render visualization based on type
         if not filtered_activity_agg.empty:
             if visualization_type == "Treemap":
-                # Build hierarchical structure for go.Treemap
-                ids = ["root"]
-                labels = ["All Activities"]
-                parents = [""]
-                values_list = [0]  # Will be summed from children
-                customdata_list = [[0] * 19]  # Root customdata placeholder
-
-                # Add all activities as children of root
-                root_total = 0
-                for idx, row in filtered_activity_agg.iterrows():
-                    activity_tag = str(row["activity_tag"])
-                    ids.append(f"activity_{activity_tag}")
-                    labels.append(activity_tag)
-                    parents.append("root")
-                    val = row[metric_column]
-                    values_list.append(val)
-                    root_total += val
-
-                # Set root value to sum of children
-                values_list[0] = root_total if root_total > 0 else 1
-
-                # Build customdata for all items
-                customdata_for_root = [0] * 19
-                customdata_list = [customdata_for_root]
-
-                # Add customdata for each activity
-                custom_data_arrays = create_standardized_customdata(filtered_activity_agg)
-                for i in range(len(filtered_activity_agg)):
-                    row_customdata = []
-                    for arr in custom_data_arrays:
-                        if i < len(arr):
-                            val = arr.iloc[i] if isinstance(arr, pd.Series) else arr[i]
-                            row_customdata.append(val)
-                        else:
-                            row_customdata.append(0)
-                    customdata_list.append(row_customdata)
-
-                # Create color array using Plotly's color scale
-                min_val = filtered_activity_agg[metric_column].min()
-                max_val = filtered_activity_agg[metric_column].max()
-
-                # Normalize values for color mapping (clamp to [0, 1])
-                if max_val > min_val:
-                    normalized = [max(0, min(1, (v - min_val) / (max_val - min_val))) for v in values_list]
-                else:
-                    normalized = [0.5] * len(values_list)
-
-                # Get Reds color scale
-                colors_scale = pc.sample_colorscale("Reds", normalized)
-
-                # Create treemap using graph_objects
-                fig = go.Figure(data=[go.Treemap(
-                    ids=ids,
-                    labels=labels,
-                    parents=parents,
-                    values=values_list,
-                    customdata=customdata_list,
-                    marker=dict(
-                        colors=colors_scale,
-                        line=dict(width=2, color="white")
-                    ),
-                    textposition="middle center",
-                    branchvalues="total"
-                )])
-
-                fig.update_layout(
-                    title=f"Activity {selected_metric} Distribution",
-                    height=420,
-                    margin=dict(l=20, r=20, t=40, b=20)
+                # Use centralized helper function for consistent treemap rendering
+                fig = create_single_metric_chart(
+                    filtered_activity_agg,
+                    metric_column,
+                    f"Activity {selected_metric} Distribution",
+                    chart_type="treemap",
+                    x_field="activity_tag"
                 )
-
                 render_chart(fig, "activity")
             
             elif visualization_type == "Bar chart":
