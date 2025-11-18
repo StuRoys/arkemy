@@ -255,6 +255,15 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
             root_total = sum(group_totals.values())
             values[0] = root_total if root_total > 0 else 1  # Ensure it's not zero
 
+            # Update group percentages now that we know the root total
+            if root_total > 0:
+                for group_name, group_total in group_totals.items():
+                    group_pct = (group_total / root_total) * 100
+                    # Update customdata for this group with its percentage
+                    group_id = group_ids[group_name]
+                    if group_id in customdata_map and len(customdata_map[group_id]) > 19:
+                        customdata_map[group_id][19] = group_pct
+
             # Build discrete color assignment for better visual separation
             # Assign colors: darker shades to customer groups, lighter to customers within
             base_colors = px.colors.qualitative.Set2  # Soft, distinct colors
