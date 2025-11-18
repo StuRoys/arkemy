@@ -266,6 +266,71 @@ def validate_period_data(
     return (True, None)
 
 
+def calculate_period_from_comparison_type(
+    comparison_type: str,
+    max_date: datetime,
+    start_year: Optional[int] = None,
+    end_year: Optional[int] = None
+) -> Tuple[datetime, datetime, datetime, datetime]:
+    """
+    Calculate period dates based on comparison type dropdown selection.
+
+    Args:
+        comparison_type: Selected comparison type from dropdown
+        max_date: Maximum date from filtered dataset
+        start_year: Start year from sidebar filters (for year comparison)
+        end_year: End year from sidebar filters (for year comparison)
+
+    Returns:
+        Tuple of (period_a_start, period_a_end, period_b_start, period_b_end)
+    """
+    # Ensure max_date is a date object
+    if isinstance(max_date, pd.Timestamp):
+        max_date = max_date.date()
+
+    if comparison_type == "Last month vs previous month":
+        return calculate_period_dates(max_date, 1, 'period')
+
+    elif comparison_type == "Last quarter vs previous quarter":
+        return calculate_period_dates(max_date, 3, 'period')
+
+    elif comparison_type == "Last 6 months vs previous 6 months":
+        return calculate_period_dates(max_date, 6, 'period')
+
+    elif comparison_type == "Last 12 months vs previous 12 months":
+        return calculate_period_dates(max_date, 12, 'period')
+
+    elif comparison_type == "Year to date vs previous year to date":
+        # Period A: Jan 1 of current year to max_date
+        period_a_start = datetime(max_date.year, 1, 1).date()
+        period_a_end = max_date
+
+        # Period B: Jan 1 of previous year to same day of previous year
+        period_b_start = datetime(max_date.year - 1, 1, 1).date()
+        period_b_end = datetime(max_date.year - 1, max_date.month, max_date.day).date()
+
+        return (period_a_start, period_a_end, period_b_start, period_b_end)
+
+    elif comparison_type == "Selected end year vs start year":
+        # Period A: Full calendar year of end_year
+        if end_year is None:
+            end_year = max_date.year
+        period_a_start = datetime(end_year, 1, 1).date()
+        period_a_end = datetime(end_year, 12, 31).date()
+
+        # Period B: Full calendar year of start_year
+        if start_year is None:
+            start_year = end_year - 1
+        period_b_start = datetime(start_year, 1, 1).date()
+        period_b_end = datetime(start_year, 12, 31).date()
+
+        return (period_a_start, period_a_end, period_b_start, period_b_end)
+
+    else:
+        # Fallback to last 6 months
+        return calculate_period_dates(max_date, 6, 'period')
+
+
 def get_metric_config() -> Dict[str, Dict[str, any]]:
     """
     Get configuration for each comparison metric.

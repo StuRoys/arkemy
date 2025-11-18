@@ -141,7 +141,7 @@ def render_dashboard():
                     )
 
             with comparison_tab:
-                render_comparison_tab(filtered_df=filtered_df)
+                render_comparison_tab(filtered_df=filtered_df, filter_settings=filter_settings)
 
     # Projects Section
     with projects_tab:

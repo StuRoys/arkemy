@@ -12,6 +12,7 @@ from typing import Dict
 
 from utils.comparison_helpers import (
     calculate_period_dates,
+    calculate_period_from_comparison_type,
     format_period_label,
     format_period_label_short,
     aggregate_period_metrics,
@@ -268,75 +269,59 @@ def render_comparison_chart(
     st.plotly_chart(fig, use_container_width=True)
 
 
-def render_comparison_tab(filtered_df: pd.DataFrame) -> None:
+def render_comparison_tab(filtered_df: pd.DataFrame, filter_settings: dict = None) -> None:
     """
     Main render function for the Period Comparison tab.
 
     Args:
         filtered_df: Filtered time records DataFrame from sidebar
+        filter_settings: Dictionary of filter settings from sidebar
     """
     st.subheader("Period Comparison")
 
     # Initialize session state keys if not present
-    if 'comparison_mode' not in st.session_state:
-        st.session_state.comparison_mode = 'period'
-    if 'comparison_months' not in st.session_state:
-        st.session_state.comparison_months = 6
-    if 'comparison_end_date' not in st.session_state:
-        # Default to last date in dataset
-        st.session_state.comparison_end_date = filtered_df['record_date'].max().date()
+    if 'comparison_type' not in st.session_state:
+        st.session_state.comparison_type = 'Last 6 months vs previous 6 months'
     if 'comparison_selected_metric' not in st.session_state:
         st.session_state.comparison_selected_metric = 'effective_rate'
 
-    # Row 1: Selection Controls
-    col1, col2, col3 = st.columns([2, 2, 2])
+    # Get max and min dates from dataset
+    max_date = filtered_df['record_date'].max().date()
 
-    with col1:
-        comparison_mode = st.radio(
-            "Comparison Mode",
-            options=['period', 'year'],
-            format_func=lambda x: 'Period vs Period' if x == 'period' else 'Year vs Year',
-            index=0 if st.session_state.comparison_mode == 'period' else 1,
-            horizontal=True,
-            key='comparison_mode_radio'
-        )
-        st.session_state.comparison_mode = comparison_mode
+    # Comparison type selector dropdown
+    comparison_options = [
+        'Last month vs previous month',
+        'Last quarter vs previous quarter',
+        'Last 6 months vs previous 6 months',
+        'Last 12 months vs previous 12 months',
+        'Year to date vs previous year to date',
+        'Selected end year vs start year'
+    ]
 
-    with col2:
-        comparison_months = st.slider(
-            "Time Frame (months)",
-            min_value=1,
-            max_value=12,
-            value=st.session_state.comparison_months,
-            step=1,
-            key='comparison_months_slider'
-        )
-        st.session_state.comparison_months = comparison_months
+    comparison_type = st.selectbox(
+        "Comparison Type",
+        options=comparison_options,
+        index=comparison_options.index(st.session_state.comparison_type),
+        key='comparison_type_selector'
+    )
+    st.session_state.comparison_type = comparison_type
 
-    with col3:
-        # Get max date from dataset
-        max_date = filtered_df['record_date'].max().date()
-        min_date = filtered_df['record_date'].min().date()
+    # Get start and end year from filter settings (if "Years" period type is selected)
+    start_year = None
+    end_year = None
 
-        # Validate session state value against current data range
-        # If filters changed and old value is now outside range, reset to max_date
-        if st.session_state.comparison_end_date > max_date or st.session_state.comparison_end_date < min_date:
-            st.session_state.comparison_end_date = max_date
+    if filter_settings and 'date_filter_config' in filter_settings:
+        filter_config = filter_settings['date_filter_config']
+        if filter_config.get('period_type') == 'Years':
+            start_year = filter_config.get('year_start', None)
+            end_year = filter_config.get('year_end', None)
 
-        comparison_end_date = st.date_input(
-            "Period A End Date",
-            value=st.session_state.comparison_end_date,
-            min_value=min_date,
-            max_value=max_date,
-            key='comparison_end_date_picker'
-        )
-        st.session_state.comparison_end_date = comparison_end_date
-
-    # Calculate period dates
-    period_a_start, period_a_end, period_b_start, period_b_end = calculate_period_dates(
-        st.session_state.comparison_end_date,
-        st.session_state.comparison_months,
-        st.session_state.comparison_mode
+    # Calculate period dates using the helper function
+    period_a_start, period_a_end, period_b_start, period_b_end = calculate_period_from_comparison_type(
+        comparison_type,
+        max_date,
+        start_year,
+        end_year
     )
 
     # Format period labels (for warnings only)
@@ -348,7 +333,7 @@ def render_comparison_tab(filtered_df: pd.DataFrame) -> None:
 
     if not is_valid:
         st.warning(warning_msg)
-        st.info("💡 Try selecting a more recent end date or shorter time frame.")
+        st.info("💡 Try adjusting your comparison type or filters.")
         return
 
     # Aggregate metrics for both periods
@@ -375,10 +360,6 @@ def render_comparison_tab(filtered_df: pd.DataFrame) -> None:
         period_a_metrics,
         period_b_metrics
     )
-
-    # Render comparison chart
-    st.markdown("---")
-    st.markdown("### Detailed Comparison")
 
     # Metric selector for chart
     metric_config = get_metric_config()
