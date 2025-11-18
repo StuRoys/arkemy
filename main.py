@@ -103,6 +103,32 @@ if 'capacity_summary_loaded' not in st.session_state:
 if 'capacity_summary_df' not in st.session_state:
     st.session_state.capacity_summary_df = None
 
+# TEMP: Auto-load parquet file for testing (without user upload)
+def auto_load_parquet_for_testing():
+    """Temporary helper to auto-load parquet files from data directory for testing"""
+    data_dir = get_data_directory()
+    parquet_files = glob.glob(os.path.join(data_dir, "*.parquet"))
+
+    if parquet_files:
+        # Load the first parquet file found
+        import pandas as pd
+        test_file = parquet_files[0]
+        try:
+            df = pd.read_parquet(test_file)
+            st.session_state.transformed_df = df[df['record_type'] == 'time_record'] if 'record_type' in df.columns else df
+            st.session_state.csv_loaded = True
+            if 'record_type' in df.columns:
+                st.session_state.transformed_planned_df = df[df['record_type'] == 'planned_record']
+                st.session_state.planned_csv_loaded = True
+            return True
+        except Exception as e:
+            print(f"Error loading test parquet: {e}")
+    return False
+
+# Auto-load for testing if data not already loaded
+if not st.session_state.get('csv_loaded', False):
+    auto_load_parquet_for_testing()
+
 # Set up app pages
 pages = [
     st.Page("pages/1_Analytics_Dashboard.py", title="Analytics Dashboard", icon="📊"),

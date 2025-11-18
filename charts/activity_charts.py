@@ -102,7 +102,13 @@ def render_activity_tab(filtered_df, aggregate_by_activity, render_chart, get_ca
                 # Add customdata for each activity
                 custom_data_arrays = create_standardized_customdata(filtered_activity_agg)
                 for i in range(len(filtered_activity_agg)):
-                    row_customdata = [arr.iloc[i] if i < len(arr) else 0 for arr in custom_data_arrays]
+                    row_customdata = []
+                    for arr in custom_data_arrays:
+                        if i < len(arr):
+                            val = arr.iloc[i] if isinstance(arr, pd.Series) else arr[i]
+                            row_customdata.append(val)
+                        else:
+                            row_customdata.append(0)
                     customdata_list.append(row_customdata)
 
                 # Create color array using Plotly's color scale
