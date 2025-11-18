@@ -48,9 +48,8 @@ def render_all_projects_snapshot(df):
         st.warning("No data available for the selected period")
         return
 
-    # Get unique projects sorted by total hours (descending)
-    project_totals = df_copy.groupby("Project Name")["Period Hours"].sum().sort_values(ascending=False)
-    available_projects = project_totals.index.tolist()
+    # Get unique projects sorted alphabetically
+    available_projects = sorted(df_copy["Project Name"].unique())
 
     # Create Stockpeer-style layout: left cell (selector) + right cell (chart)
     cols = st.columns([1, 3])
@@ -77,7 +76,6 @@ def render_all_projects_snapshot(df):
             label_visibility="collapsed"
         )
 
-        st.markdown("---")
         st.markdown("### Metric")
 
         # Metric configuration: display label → (column/calculation, y-axis title, format)
@@ -99,7 +97,6 @@ def render_all_projects_snapshot(df):
 
         metric_col, y_title, metric_format = metric_options[selected_metric_key]
 
-        st.markdown("---")
         st.markdown("### Period")
 
         # Period selection buttons (Stockpeer-style)
