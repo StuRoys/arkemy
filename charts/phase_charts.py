@@ -2,8 +2,10 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+import plotly.colors as pc
 from utils.chart_helpers import create_standardized_customdata
-from utils.chart_styles import get_metric_options
+from utils.chart_styles import get_metric_options, create_treemap_hovertemplate
 
 def render_phase_tab(filtered_df, aggregate_by_phase, render_chart, get_category_colors):
     """
@@ -72,16 +74,66 @@ def render_phase_tab(filtered_df, aggregate_by_phase, render_chart, get_category
         # Render visualization based on type
         if not filtered_phase_agg.empty:
             if visualization_type == "Treemap":
-                # Phase treemap - using filtered data with standardized custom data
-                fig = px.treemap(
-                    filtered_phase_agg,
-                    path=["phase_tag"],
-                    values=metric_column,
-                    color=metric_column,
-                    color_continuous_scale="Purples",
-                    custom_data=create_standardized_customdata(filtered_phase_agg),
-                    title=f"Phase {selected_metric} Distribution"
+                # Build hierarchical structure for go.Treemap
+                ids = ["root"]
+                labels = ["All Phases"]
+                parents = [""]
+                values_list = [0]  # Will be summed from children
+                customdata_list = [[0] * 19]  # Root customdata placeholder
+
+                # Add all phases as children of root
+                for idx, row in filtered_phase_agg.iterrows():
+                    phase_tag = str(row["phase_tag"])
+                    ids.append(f"phase_{phase_tag}")
+                    labels.append(phase_tag)
+                    parents.append("root")
+                    values_list.append(row[metric_column])
+
+                # Build customdata for all items
+                customdata_for_root = [0] * 19
+                customdata_list = [customdata_for_root]
+
+                # Add customdata for each phase
+                custom_data_arrays = create_standardized_customdata(filtered_phase_agg)
+                for i in range(len(filtered_phase_agg)):
+                    row_customdata = [arr[i] if i < len(arr) else 0 for arr in custom_data_arrays]
+                    customdata_list.append(row_customdata)
+
+                # Create color array using Plotly's color scale
+                min_val = filtered_phase_agg[metric_column].min()
+                max_val = filtered_phase_agg[metric_column].max()
+
+                # Normalize values for color mapping
+                if max_val > min_val:
+                    normalized = [(v - min_val) / (max_val - min_val) for v in values_list]
+                else:
+                    normalized = [0.5] * len(values_list)
+
+                # Get Purples color scale
+                colors_scale = pc.sample_colorscale("Purples", normalized)
+
+                # Create treemap using graph_objects
+                fig = go.Figure(data=[go.Treemap(
+                    ids=ids,
+                    labels=labels,
+                    parents=parents,
+                    values=values_list,
+                    customdata=customdata_list,
+                    marker=dict(
+                        colors=colors_scale,
+                        line=dict(width=2, color="white")
+                    ),
+                    textposition="middle center",
+                    hovertemplate=create_treemap_hovertemplate("phase"),
+                    branchvalues="total"
+                )])
+
+                fig.update_layout(
+                    title=f"Phase {selected_metric} Distribution",
+                    height=420,
+                    margin=dict(l=20, r=20, t=40, b=20)
                 )
+
                 render_chart(fig, "phase")
             
             elif visualization_type == "Bar chart":

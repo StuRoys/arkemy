@@ -2,8 +2,9 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from utils.chart_helpers import create_standardized_customdata
-from utils.chart_styles import get_metric_options
+from utils.chart_styles import get_metric_options, create_treemap_hovertemplate
 from utils.processors import get_project_tag_columns, aggregate_by_project_tag, get_project_tag_columns_with_labels
 from utils.tag_manager import get_tag_display_name
 
@@ -110,16 +111,67 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
     # Render visualization based on type
     if not filtered_project_type_agg.empty:
         if visualization_type == "Treemap":
-            # Project type treemap with standardized custom data
-            fig = px.treemap(
-                filtered_project_type_agg,
-                path=[selected_tag_column],
-                values=metric_column,
-                color=metric_column,
-                color_continuous_scale="Greens",
-                custom_data=create_standardized_customdata(filtered_project_type_agg),
-                title=f"{selected_tag_display_name} {selected_metric} Distribution"
+            # Build hierarchical structure for go.Treemap
+            ids = [f"root"]
+            labels = [f"All {selected_tag_display_name}"]
+            parents = [""]
+            values_list = [0]  # Will be summed from children
+            customdata_list = [[0] * 19]  # Root customdata placeholder
+
+            # Add all project tags as children of root
+            for idx, row in filtered_project_type_agg.iterrows():
+                tag_value = str(row[selected_tag_column])
+                ids.append(f"tag_{tag_value}")
+                labels.append(tag_value)
+                parents.append("root")
+                values_list.append(row[metric_column])
+
+            # Build customdata for all items (root + tags)
+            customdata_for_root = [0] * 19
+            customdata_list = [customdata_for_root]
+
+            # Add customdata for each tag
+            custom_data_arrays = create_standardized_customdata(filtered_project_type_agg)
+            for i in range(len(filtered_project_type_agg)):
+                row_customdata = [arr[i] if i < len(arr) else 0 for arr in custom_data_arrays]
+                customdata_list.append(row_customdata)
+
+            # Create color array using Plotly's color scale
+            import plotly.colors as pc
+            min_val = filtered_project_type_agg[metric_column].min()
+            max_val = filtered_project_type_agg[metric_column].max()
+
+            # Normalize values for color mapping
+            if max_val > min_val:
+                normalized = [(v - min_val) / (max_val - min_val) for v in values_list]
+            else:
+                normalized = [0.5] * len(values_list)
+
+            # Get Greens color scale
+            colors_scale = pc.sample_colorscale("Greens", normalized)
+
+            # Create treemap using graph_objects
+            fig = go.Figure(data=[go.Treemap(
+                ids=ids,
+                labels=labels,
+                parents=parents,
+                values=values_list,
+                customdata=customdata_list,
+                marker=dict(
+                    colors=colors_scale,
+                    line=dict(width=2, color="white")
+                ),
+                textposition="middle center",
+                hovertemplate=create_treemap_hovertemplate("project_type"),
+                branchvalues="total"
+            )])
+
+            fig.update_layout(
+                title=f"{selected_tag_display_name} {selected_metric} Distribution",
+                height=420,
+                margin=dict(l=20, r=20, t=40, b=20)
             )
+
             render_chart(fig, "project_type")
 
         elif visualization_type == "Bar chart":

@@ -2,8 +2,10 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+import plotly.colors as pc
 from utils.chart_helpers import create_standardized_customdata
-from utils.chart_styles import get_metric_options
+from utils.chart_styles import get_metric_options, create_treemap_hovertemplate
 
 def render_people_tab(filtered_df, aggregate_by_person, render_chart, get_category_colors):
     """
@@ -70,16 +72,66 @@ def render_people_tab(filtered_df, aggregate_by_person, render_chart, get_catego
     # Render visualization based on type
     if not filtered_person_agg.empty:
         if visualization_type == "Treemap":
-            # Person treemap - using filtered data with standardized custom data
-            fig = px.treemap(
-                filtered_person_agg,
-                path=["person_name"],
-                values=metric_column,
-                color=metric_column,
-                color_continuous_scale="Blues",
-                custom_data=create_standardized_customdata(filtered_person_agg),
-                title=f"People {selected_metric} Distribution"
+            # Build hierarchical structure for go.Treemap
+            ids = ["root"]
+            labels = ["All People"]
+            parents = [""]
+            values_list = [0]  # Will be summed from children
+            customdata_list = [[0] * 19]  # Root customdata placeholder
+
+            # Add all people as children of root
+            for idx, row in filtered_person_agg.iterrows():
+                person_name = str(row["person_name"])
+                ids.append(f"person_{person_name}")
+                labels.append(person_name)
+                parents.append("root")
+                values_list.append(row[metric_column])
+
+            # Build customdata for all items
+            customdata_for_root = [0] * 19
+            customdata_list = [customdata_for_root]
+
+            # Add customdata for each person
+            custom_data_arrays = create_standardized_customdata(filtered_person_agg)
+            for i in range(len(filtered_person_agg)):
+                row_customdata = [arr[i] if i < len(arr) else 0 for arr in custom_data_arrays]
+                customdata_list.append(row_customdata)
+
+            # Create color array using Plotly's color scale
+            min_val = filtered_person_agg[metric_column].min()
+            max_val = filtered_person_agg[metric_column].max()
+
+            # Normalize values for color mapping
+            if max_val > min_val:
+                normalized = [(v - min_val) / (max_val - min_val) for v in values_list]
+            else:
+                normalized = [0.5] * len(values_list)
+
+            # Get Blues color scale
+            colors_scale = pc.sample_colorscale("Blues", normalized)
+
+            # Create treemap using graph_objects
+            fig = go.Figure(data=[go.Treemap(
+                ids=ids,
+                labels=labels,
+                parents=parents,
+                values=values_list,
+                customdata=customdata_list,
+                marker=dict(
+                    colors=colors_scale,
+                    line=dict(width=2, color="white")
+                ),
+                textposition="middle center",
+                hovertemplate=create_treemap_hovertemplate("person"),
+                branchvalues="total"
+            )])
+
+            fig.update_layout(
+                title=f"People {selected_metric} Distribution",
+                height=420,
+                margin=dict(l=20, r=20, t=40, b=20)
             )
+
             render_chart(fig, "person")
         
         elif visualization_type == "Bar chart":
