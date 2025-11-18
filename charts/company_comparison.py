@@ -318,21 +318,196 @@ def render_comparison_chart(
     st.plotly_chart(fig, use_container_width=True)
 
 
-def render_comparison_tab(filtered_df: pd.DataFrame, filter_settings: dict = None) -> None:
+def apply_non_date_filters(df: pd.DataFrame, filter_settings: dict) -> pd.DataFrame:
+    """
+    Apply all filters from filter_settings EXCEPT date filters.
+    This allows period comparison to work across date ranges while respecting customer/project/person filters.
+
+    Args:
+        df: Full unfiltered DataFrame
+        filter_settings: Dictionary of filter settings from sidebar
+
+    Returns:
+        DataFrame with non-date filters applied
+    """
+    filtered_df = df.copy()
+
+    # Customer filters (included)
+    if 'included_customers' in filter_settings and filter_settings['included_customers']:
+        customer_col = None
+        if 'Customer' in filtered_df.columns:
+            customer_col = 'Customer'
+        elif 'customer' in filtered_df.columns:
+            customer_col = 'customer'
+        if customer_col:
+            filtered_df = filtered_df[filtered_df[customer_col].isin(filter_settings['included_customers'])]
+
+    # Customer filters (excluded)
+    if 'excluded_customers' in filter_settings and filter_settings['excluded_customers']:
+        customer_col = None
+        if 'Customer' in filtered_df.columns:
+            customer_col = 'Customer'
+        elif 'customer' in filtered_df.columns:
+            customer_col = 'customer'
+        if customer_col:
+            filtered_df = filtered_df[~filtered_df[customer_col].isin(filter_settings['excluded_customers'])]
+
+    # Project filters (included)
+    if 'included_projects' in filter_settings and filter_settings['included_projects']:
+        project_col = None
+        if 'project_number' in filtered_df.columns:
+            project_col = 'project_number'
+        elif 'Project number' in filtered_df.columns:
+            project_col = 'Project number'
+        if project_col:
+            filtered_df = filtered_df[filtered_df[project_col].isin(filter_settings['included_projects'])]
+
+    # Project filters (excluded)
+    if 'excluded_projects' in filter_settings and filter_settings['excluded_projects']:
+        project_col = None
+        if 'project_number' in filtered_df.columns:
+            project_col = 'project_number'
+        elif 'Project number' in filtered_df.columns:
+            project_col = 'Project number'
+        if project_col:
+            filtered_df = filtered_df[~filtered_df[project_col].isin(filter_settings['excluded_projects'])]
+
+    # Person filters (included)
+    if 'included_persons' in filter_settings and filter_settings['included_persons']:
+        person_col = None
+        if 'Person' in filtered_df.columns:
+            person_col = 'Person'
+        elif 'person_name' in filtered_df.columns:
+            person_col = 'person_name'
+        if person_col:
+            filtered_df = filtered_df[filtered_df[person_col].isin(filter_settings['included_persons'])]
+
+    # Person filters (excluded)
+    if 'excluded_persons' in filter_settings and filter_settings['excluded_persons']:
+        person_col = None
+        if 'Person' in filtered_df.columns:
+            person_col = 'Person'
+        elif 'person_name' in filtered_df.columns:
+            person_col = 'person_name'
+        if person_col:
+            filtered_df = filtered_df[~filtered_df[person_col].isin(filter_settings['excluded_persons'])]
+
+    # Person type filter
+    if 'selected_person_type' in filter_settings and filter_settings['selected_person_type'] != 'all':
+        person_type_col = None
+        if 'Person type' in filtered_df.columns:
+            person_type_col = 'Person type'
+        elif 'person_type' in filtered_df.columns:
+            person_type_col = 'person_type'
+        if person_type_col:
+            if filter_settings['selected_person_type'] == 'internal':
+                mask = filtered_df[person_type_col].notna() & (filtered_df[person_type_col].str.lower() == 'internal')
+                filtered_df = filtered_df[mask]
+            elif filter_settings['selected_person_type'] == 'external':
+                mask = filtered_df[person_type_col].notna() & (filtered_df[person_type_col].str.lower() == 'external')
+                filtered_df = filtered_df[mask]
+
+    # Project type filters (included)
+    if 'included_project_types' in filter_settings and filter_settings['included_project_types']:
+        project_type_col = None
+        if 'Project type' in filtered_df.columns:
+            project_type_col = 'Project type'
+        elif 'project_tag' in filtered_df.columns:
+            project_type_col = 'project_tag'
+        if project_type_col:
+            filtered_df = filtered_df[filtered_df[project_type_col].isin(filter_settings['included_project_types'])]
+
+    # Project type filters (excluded)
+    if 'excluded_project_types' in filter_settings and filter_settings['excluded_project_types']:
+        project_type_col = None
+        if 'Project type' in filtered_df.columns:
+            project_type_col = 'Project type'
+        elif 'project_tag' in filtered_df.columns:
+            project_type_col = 'project_tag'
+        if project_type_col:
+            filtered_df = filtered_df[~filtered_df[project_type_col].isin(filter_settings['excluded_project_types'])]
+
+    # Price model filters (included)
+    if 'included_price_models' in filter_settings and filter_settings['included_price_models']:
+        price_model_col = None
+        if 'Price model' in filtered_df.columns:
+            price_model_col = 'Price model'
+        elif 'price_model_type' in filtered_df.columns:
+            price_model_col = 'price_model_type'
+        if price_model_col:
+            filtered_df = filtered_df[filtered_df[price_model_col].isin(filter_settings['included_price_models'])]
+
+    # Price model filters (excluded)
+    if 'excluded_price_models' in filter_settings and filter_settings['excluded_price_models']:
+        price_model_col = None
+        if 'Price model' in filtered_df.columns:
+            price_model_col = 'Price model'
+        elif 'price_model_type' in filtered_df.columns:
+            price_model_col = 'price_model_type'
+        if price_model_col:
+            filtered_df = filtered_df[~filtered_df[price_model_col].isin(filter_settings['excluded_price_models'])]
+
+    # Activity filters (included)
+    if 'included_activities' in filter_settings and filter_settings['included_activities']:
+        activity_col = None
+        if 'Activity' in filtered_df.columns:
+            activity_col = 'Activity'
+        elif 'activity_tag' in filtered_df.columns:
+            activity_col = 'activity_tag'
+        if activity_col:
+            filtered_df = filtered_df[filtered_df[activity_col].isin(filter_settings['included_activities'])]
+
+    # Activity filters (excluded)
+    if 'excluded_activities' in filter_settings and filter_settings['excluded_activities']:
+        activity_col = None
+        if 'Activity' in filtered_df.columns:
+            activity_col = 'Activity'
+        elif 'activity_tag' in filtered_df.columns:
+            activity_col = 'activity_tag'
+        if activity_col:
+            filtered_df = filtered_df[~filtered_df[activity_col].isin(filter_settings['excluded_activities'])]
+
+    # Phase filters (included)
+    if 'included_phases' in filter_settings and filter_settings['included_phases']:
+        phase_col = None
+        if 'Phase' in filtered_df.columns:
+            phase_col = 'Phase'
+        elif 'phase_tag' in filtered_df.columns:
+            phase_col = 'phase_tag'
+        if phase_col:
+            filtered_df = filtered_df[filtered_df[phase_col].isin(filter_settings['included_phases'])]
+
+    # Phase filters (excluded)
+    if 'excluded_phases' in filter_settings and filter_settings['excluded_phases']:
+        phase_col = None
+        if 'Phase' in filtered_df.columns:
+            phase_col = 'Phase'
+        elif 'phase_tag' in filtered_df.columns:
+            phase_col = 'phase_tag'
+        if phase_col:
+            filtered_df = filtered_df[~filtered_df[phase_col].isin(filter_settings['excluded_phases'])]
+
+    return filtered_df
+
+
+def render_comparison_tab(full_df: pd.DataFrame, filter_settings: dict = None) -> None:
     """
     Main render function for the Period Comparison tab.
 
     Args:
-        filtered_df: Filtered time records DataFrame from sidebar
+        full_df: Full unfiltered time records DataFrame (bypasses date filters)
         filter_settings: Dictionary of filter settings from sidebar
     """
     # Initialize session state keys if not present
     if 'comparison_type' not in st.session_state:
-        st.session_state.comparison_type = 'Latest 6 months vs preceding 6 months'
+        st.session_state.comparison_type = 'Latest month vs preceding month'
     if 'comparison_selected_metric' not in st.session_state:
         st.session_state.comparison_selected_metric = 'effective_rate'
 
-    # Get max and min dates from dataset
+    # Apply non-date filters to full dataset
+    filtered_df = apply_non_date_filters(full_df, filter_settings) if filter_settings else full_df.copy()
+
+    # Get max date from filtered (but not by date) dataset
     max_date = filtered_df['record_date'].max().date()
 
     # Comparison type selector dropdown
@@ -349,6 +524,10 @@ def render_comparison_tab(filtered_df: pd.DataFrame, filter_settings: dict = Non
     col1, col2 = st.columns([1, 1])
 
     with col1:
+        # Validate that stored comparison_type is still in options, reset if not
+        if st.session_state.comparison_type not in comparison_options:
+            st.session_state.comparison_type = comparison_options[0]  # Default to "Latest month vs preceding month"
+
         comparison_type = st.selectbox(
             label="",
             options=comparison_options,
