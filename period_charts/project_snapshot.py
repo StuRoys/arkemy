@@ -48,9 +48,6 @@ def render_all_projects_snapshot(df):
         st.warning("No data available for the selected period")
         return
 
-    # Get unique projects sorted alphabetically
-    available_projects = sorted(df_copy["Project Name"].unique())
-
     # Create Stockpeer-style layout: left cell (selector) + right cell (chart)
     cols = st.columns([1, 3])
 
@@ -62,6 +59,46 @@ def render_all_projects_snapshot(df):
     )
 
     with left_cell:
+        st.markdown("### Period")
+
+        # Period selection buttons (Stockpeer-style)
+        period_options = {
+            "1M": 1,
+            "3M": 3,
+            "6M": 6,
+            "YTD": "ytd",
+            "1Y": 12,
+            "All": "all"
+        }
+
+        # Create pill buttons for period selection (Stockpeer-style)
+        selected_period_key = st.pills(
+            "Period",
+            options=list(period_options.keys()),
+            default="1Y",
+            label_visibility="collapsed"
+        )
+
+        selected_period_value = period_options[selected_period_key]
+
+        # Apply period filter to get relevant projects
+        df_filtered = df_copy.copy()
+        if selected_period_value != "all":
+            max_period = df_copy["Period"].max()
+
+            if selected_period_value == "ytd":
+                # Year to date - from January 1st to max_period
+                start_of_year = pd.Timestamp(max_period.year, 1, 1)
+                df_filtered = df_filtered[df_filtered["Period"] >= start_of_year]
+            else:
+                # Months back (1M, 3M, 6M, 1Y)
+                months_back = selected_period_value
+                start_period = max_period - pd.DateOffset(months=months_back)
+                df_filtered = df_filtered[df_filtered["Period"] >= start_period]
+
+        # Get unique projects from filtered data, sorted alphabetically
+        available_projects = sorted(df_filtered["Project Name"].unique())
+
         st.markdown("### Projects")
 
         # Add "All projects" option
@@ -97,28 +134,6 @@ def render_all_projects_snapshot(df):
 
         metric_col, y_title, metric_format = metric_options[selected_metric_key]
 
-        st.markdown("### Period")
-
-        # Period selection buttons (Stockpeer-style)
-        period_options = {
-            "1M": 1,
-            "3M": 3,
-            "6M": 6,
-            "YTD": "ytd",
-            "1Y": 12,
-            "All": "all"
-        }
-
-        # Create pill buttons for period selection (Stockpeer-style)
-        selected_period_key = st.pills(
-            "Period",
-            options=list(period_options.keys()),
-            default="1Y",
-            label_visibility="collapsed"
-        )
-
-        selected_period_value = period_options[selected_period_key]
-
     # RIGHT CELL: Chart
     right_cell = cols[1].container(
         border=True,
@@ -132,41 +147,27 @@ def render_all_projects_snapshot(df):
             st.info("Select one or more projects to view chart")
             return
 
-        # Apply period filter
-        if selected_period_value != "all":
-            max_period = df_copy["Period"].max()
-
-            if selected_period_value == "ytd":
-                # Year to date - from January 1st to max_period
-                start_of_year = pd.Timestamp(max_period.year, 1, 1)
-                df_copy = df_copy[df_copy["Period"] >= start_of_year]
-            else:
-                # Months back (1M, 3M, 6M, 1Y)
-                months_back = selected_period_value
-                start_period = max_period - pd.DateOffset(months=months_back)
-                df_copy = df_copy[df_copy["Period"] >= start_period]
-
         # Calculate derived metrics if needed
         if metric_col in ["billability", "effective_rate", "billable_rate"]:
             if metric_col == "billability":
                 # Billability % = (Billable Hours / Period Hours) * 100
-                df_copy["billability"] = (df_copy["Billable Hours"] / df_copy["Period Hours"]) * 100
-                df_copy["billability"] = df_copy["billability"].fillna(0).replace([np.inf, -np.inf], 0)
+                df_filtered["billability"] = (df_filtered["Billable Hours"] / df_filtered["Period Hours"]) * 100
+                df_filtered["billability"] = df_filtered["billability"].fillna(0).replace([np.inf, -np.inf], 0)
             elif metric_col == "effective_rate":
                 # Effective rate = Fees / Period Hours
-                df_copy["effective_rate"] = df_copy["Period Fees Adjusted"] / df_copy["Period Hours"]
-                df_copy["effective_rate"] = df_copy["effective_rate"].fillna(0).replace([np.inf, -np.inf], 0)
+                df_filtered["effective_rate"] = df_filtered["Period Fees Adjusted"] / df_filtered["Period Hours"]
+                df_filtered["effective_rate"] = df_filtered["effective_rate"].fillna(0).replace([np.inf, -np.inf], 0)
             elif metric_col == "billable_rate":
                 # Billable rate = Fees / Billable Hours
-                df_copy["billable_rate"] = df_copy["Period Fees Adjusted"] / df_copy["Billable Hours"]
-                df_copy["billable_rate"] = df_copy["billable_rate"].fillna(0).replace([np.inf, -np.inf], 0)
+                df_filtered["billable_rate"] = df_filtered["Period Fees Adjusted"] / df_filtered["Billable Hours"]
+                df_filtered["billable_rate"] = df_filtered["billable_rate"].fillna(0).replace([np.inf, -np.inf], 0)
 
         # Check if "All projects" is selected
         if all_projects_label in selected_projects:
             # Aggregate all projects
             agg_dict = {"Period Hours": "sum", "Billable Hours": "sum", "Period Fees Adjusted": "sum"}
 
-            plot_data = df_copy.groupby("Period", as_index=False).agg(agg_dict)
+            plot_data = df_filtered.groupby("Period", as_index=False).agg(agg_dict)
             plot_data["Project Name"] = "All projects"
 
             # Recalculate derived metrics after aggregation
@@ -181,7 +182,7 @@ def render_all_projects_snapshot(df):
                 plot_data["billable_rate"] = plot_data["billable_rate"].fillna(0).replace([np.inf, -np.inf], 0)
         else:
             # Filter for selected projects
-            plot_data = df_copy[df_copy["Project Name"].isin(selected_projects)].copy()
+            plot_data = df_filtered[df_filtered["Project Name"].isin(selected_projects)].copy()
 
         # Sort by period for chronological display
         plot_data = plot_data.sort_values("Period")
