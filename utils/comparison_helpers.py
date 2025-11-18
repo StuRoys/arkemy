@@ -110,7 +110,9 @@ def aggregate_period_metrics(
             - fee: Total fee/revenue
             - profit: Total profit
             - profit_margin: Profit % of fee (0-100)
-            - hours_used: Total hours worked (for reference)
+            - hours_used: Total hours worked
+            - hours_billable: Total billable hours
+            - billable_rate: Fee per billable hour
     """
     # Filter to date range (inclusive)
     period_df = df[
@@ -127,6 +129,8 @@ def aggregate_period_metrics(
             'profit': 0.0,
             'profit_margin': 0.0,
             'hours_used': 0.0,
+            'hours_billable': 0.0,
+            'billable_rate': 0.0,
             'has_data': False
         }
 
@@ -140,6 +144,7 @@ def aggregate_period_metrics(
     effective_rate = total_fee / total_hours if total_hours > 0 else 0.0
     billability = (total_billable / total_hours * 100) if total_hours > 0 else 0.0
     profit_margin = (total_profit / total_fee * 100) if total_fee > 0 else 0.0
+    billable_rate = total_fee / total_billable if total_billable > 0 else 0.0
 
     return {
         'effective_rate': round(effective_rate, 2),
@@ -148,6 +153,8 @@ def aggregate_period_metrics(
         'profit': round(total_profit, 2),
         'profit_margin': round(profit_margin, 2),
         'hours_used': round(total_hours, 2),
+        'hours_billable': round(total_billable, 2),
+        'billable_rate': round(billable_rate, 2),
         'has_data': True
     }
 
@@ -175,7 +182,7 @@ def calculate_comparison(
             }
         }
     """
-    metrics_to_compare = ['hours_used', 'effective_rate', 'billability', 'fee', 'profit', 'profit_margin']
+    metrics_to_compare = ['hours_used', 'hours_billable', 'effective_rate', 'billable_rate', 'billability', 'fee', 'profit', 'profit_margin']
     comparison = {}
 
     for metric in metrics_to_compare:
@@ -348,8 +355,18 @@ def get_metric_config() -> Dict[str, Dict[str, any]]:
             'unit': 'hours',
             'positive_is_good': True
         },
+        'hours_billable': {
+            'label': 'Billable Hours',
+            'unit': 'hours',
+            'positive_is_good': True
+        },
         'effective_rate': {
             'label': 'Effective Rate',
+            'unit': 'currency_per_hour',
+            'positive_is_good': True
+        },
+        'billable_rate': {
+            'label': 'Billable Rate',
             'unit': 'currency_per_hour',
             'positive_is_good': True
         },

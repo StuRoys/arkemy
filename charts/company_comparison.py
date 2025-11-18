@@ -46,9 +46,11 @@ def format_metric_value(value: float, unit_type: str) -> str:
         else:
             return f"{value:,.0f} {symbol}/hr"
     elif unit_type == 'percentage':
-        return f"{value:,.1f}%"
+        # Only profit_margin uses this with decimals; others should be .0f
+        # Check if value is profit margin (typically small percentage)
+        return f"{value:,.0f}%"
     else:
-        return f"{value:,.1f}"
+        return f"{value:,.0f}"
 
 
 def render_period_card(
@@ -197,6 +199,7 @@ def render_comparison_chart(
 ) -> None:
     """
     Render a grouped bar chart comparing Period A vs Period B for the selected metric.
+    Includes percentage change labels and delta indicators to highlight even small differences.
 
     Args:
         selected_metric: Which metric to display
@@ -212,6 +215,22 @@ def render_comparison_chart(
     metric_data = comparison[selected_metric]
     value_a = metric_data['a']
     value_b = metric_data['b']
+    pct_change = metric_data['pct_change']
+    direction = metric_data['direction']
+
+    # Determine text template (no decimals except for profit_margin)
+    if selected_metric == 'profit_margin':
+        text_template = '%{text:,.1f}'
+    else:
+        text_template = '%{text:,.0f}'
+
+    # Determine change color
+    if direction == 'up':
+        change_color = '#2ca02c' if config['positive_is_good'] else '#d62728'  # Green if good, red if bad
+    elif direction == 'down':
+        change_color = '#d62728' if config['positive_is_good'] else '#2ca02c'  # Red if bad, green if good
+    else:
+        change_color = '#808080'  # Gray for neutral
 
     # Create bar chart
     fig = go.Figure()
@@ -224,8 +243,8 @@ def render_comparison_chart(
         marker_color='#1f77b4',  # Dark blue
         text=[value_a],
         textposition='outside',
-        texttemplate='%{text:,.1f}',
-        hovertemplate=f'<b>Period A</b><br>{period_a_label}<br>Value: %{{y:,.1f}}<extra></extra>'
+        texttemplate=text_template,
+        hovertemplate=f'<b>Period A</b><br>{period_a_label}<br>Value: %{{y:,.0f}}<extra></extra>' if selected_metric != 'profit_margin' else f'<b>Period A</b><br>{period_a_label}<br>Value: %{{y:,.1f}}%<extra></extra>'
     ))
 
     # Period B bar
@@ -236,9 +255,37 @@ def render_comparison_chart(
         marker_color='#aec7e8',  # Light blue
         text=[value_b],
         textposition='outside',
-        texttemplate='%{text:,.1f}',
-        hovertemplate=f'<b>Period B</b><br>{period_b_label}<br>Value: %{{y:,.1f}}<extra></extra>'
+        texttemplate=text_template,
+        hovertemplate=f'<b>Period B</b><br>{period_b_label}<br>Value: %{{y:,.0f}}<extra></extra>' if selected_metric != 'profit_margin' else f'<b>Period B</b><br>{period_b_label}<br>Value: %{{y:,.1f}}%<extra></extra>'
     ))
+
+    # Add percentage change annotation above the chart (very visible)
+    max_value = max(value_a, value_b)
+    annotation_y = max_value * 1.15
+
+    arrow_symbol = '↑' if direction == 'up' else '↓' if direction == 'down' else '→'
+    fig.add_annotation(
+        x=0.5,
+        y=annotation_y,
+        text=f"<b>{pct_change:+.1f}%</b> {arrow_symbol}",
+        showarrow=False,
+        font=dict(size=20, color=change_color),
+        xref='paper',
+        yref='y'
+    )
+
+    # Add delta value annotation (absolute difference)
+    diff_value = metric_data['diff']
+    delta_y = max_value * 1.05
+    fig.add_annotation(
+        x=0.5,
+        y=delta_y,
+        text=f"Δ {abs(diff_value):,.0f}" if selected_metric != 'profit_margin' else f"Δ {abs(diff_value):,.1f}",
+        showarrow=False,
+        font=dict(size=12, color=change_color),
+        xref='paper',
+        yref='y'
+    )
 
     # Format y-axis title based on unit
     if config['unit'] == 'currency':
@@ -260,7 +307,7 @@ def render_comparison_chart(
         barmode='group',
         showlegend=True,
         height=550,
-        margin=dict(l=20, r=20, t=60, b=20),
+        margin=dict(l=20, r=20, t=100, b=20),  # Increased top margin for annotations
         font=dict(size=14),
         hovermode='x unified'
     )
@@ -298,13 +345,31 @@ def render_comparison_tab(filtered_df: pd.DataFrame, filter_settings: dict = Non
         'Selected end year vs start year'
     ]
 
-    comparison_type = st.selectbox(
-        "Comparison Type",
-        options=comparison_options,
-        index=comparison_options.index(st.session_state.comparison_type),
-        key='comparison_type_selector'
-    )
-    st.session_state.comparison_type = comparison_type
+    # Align dropdowns horizontally
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        comparison_type = st.selectbox(
+            "Comparison Type",
+            options=comparison_options,
+            index=comparison_options.index(st.session_state.comparison_type),
+            key='comparison_type_selector'
+        )
+        st.session_state.comparison_type = comparison_type
+
+    # Metric selector for chart
+    metric_config = get_metric_config()
+    metric_options = {name: config['label'] for name, config in metric_config.items()}
+
+    with col2:
+        selected_metric = st.selectbox(
+            "Select metric to visualize:",
+            options=list(metric_options.keys()),
+            format_func=lambda x: metric_options[x],
+            index=list(metric_options.keys()).index(st.session_state.comparison_selected_metric),
+            key='comparison_metric_selector'
+        )
+        st.session_state.comparison_selected_metric = selected_metric
 
     # Get start and end year from filter settings (if "Years" period type is selected)
     start_year = None
@@ -347,19 +412,6 @@ def render_comparison_tab(filtered_df: pd.DataFrame, filter_settings: dict = Non
 
     # Calculate comparison
     comparison = calculate_comparison(period_a_metrics, period_b_metrics)
-
-    # Metric selector for chart
-    metric_config = get_metric_config()
-    metric_options = {name: config['label'] for name, config in metric_config.items()}
-
-    selected_metric = st.selectbox(
-        "Select metric to visualize:",
-        options=list(metric_options.keys()),
-        format_func=lambda x: metric_options[x],
-        index=list(metric_options.keys()).index(st.session_state.comparison_selected_metric),
-        key='comparison_metric_selector'
-    )
-    st.session_state.comparison_selected_metric = selected_metric
 
     # Render chart
     render_comparison_chart(
