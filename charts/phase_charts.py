@@ -103,9 +103,9 @@ def render_phase_tab(filtered_df, aggregate_by_phase, render_chart, get_category
                 min_val = filtered_phase_agg[metric_column].min()
                 max_val = filtered_phase_agg[metric_column].max()
 
-                # Normalize values for color mapping
+                # Normalize values for color mapping (clamp to [0, 1])
                 if max_val > min_val:
-                    normalized = [(v - min_val) / (max_val - min_val) for v in values_list]
+                    normalized = [max(0, min(1, (v - min_val) / (max_val - min_val))) for v in values_list]
                 else:
                     normalized = [0.5] * len(values_list)
 
