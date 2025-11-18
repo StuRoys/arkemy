@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from utils.chart_helpers import create_standardized_customdata
-from utils.chart_styles import get_metric_options, create_treemap_hovertemplate
+from utils.chart_styles import get_metric_options
 from utils.processors import get_project_tag_columns, aggregate_by_project_tag, get_project_tag_columns_with_labels
 from utils.tag_manager import get_tag_display_name
 
@@ -119,12 +119,18 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
             customdata_list = [[0] * 19]  # Root customdata placeholder
 
             # Add all project tags as children of root
+            root_total = 0
             for idx, row in filtered_project_type_agg.iterrows():
                 tag_value = str(row[selected_tag_column])
                 ids.append(f"tag_{tag_value}")
                 labels.append(tag_value)
                 parents.append("root")
-                values_list.append(row[metric_column])
+                val = row[metric_column]
+                values_list.append(val)
+                root_total += val
+
+            # Set root value to sum of children
+            values_list[0] = root_total if root_total > 0 else 1
 
             # Build customdata for all items (root + tags)
             customdata_for_root = [0] * 19
@@ -162,7 +168,6 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
                     line=dict(width=2, color="white")
                 ),
                 textposition="middle center",
-                hovertemplate=create_treemap_hovertemplate("project_type"),
                 branchvalues="total"
             )])
 

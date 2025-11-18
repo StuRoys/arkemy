@@ -5,7 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.colors as pc
 from utils.chart_helpers import create_standardized_customdata
-from utils.chart_styles import get_metric_options, create_treemap_hovertemplate
+from utils.chart_styles import get_metric_options
 
 def render_phase_tab(filtered_df, aggregate_by_phase, render_chart, get_category_colors):
     """
@@ -82,12 +82,18 @@ def render_phase_tab(filtered_df, aggregate_by_phase, render_chart, get_category
                 customdata_list = [[0] * 19]  # Root customdata placeholder
 
                 # Add all phases as children of root
+                root_total = 0
                 for idx, row in filtered_phase_agg.iterrows():
                     phase_tag = str(row["phase_tag"])
                     ids.append(f"phase_{phase_tag}")
                     labels.append(phase_tag)
                     parents.append("root")
-                    values_list.append(row[metric_column])
+                    val = row[metric_column]
+                    values_list.append(val)
+                    root_total += val
+
+                # Set root value to sum of children
+                values_list[0] = root_total if root_total > 0 else 1
 
                 # Build customdata for all items
                 customdata_for_root = [0] * 19
@@ -124,7 +130,6 @@ def render_phase_tab(filtered_df, aggregate_by_phase, render_chart, get_category
                         line=dict(width=2, color="white")
                     ),
                     textposition="middle center",
-                    hovertemplate=create_treemap_hovertemplate("phase"),
                     branchvalues="total"
                 )])
 
