@@ -54,7 +54,7 @@ def render_all_projects_snapshot(df):
     # Create Stockpeer-style layout: left cell (selector) + right cell (chart)
     cols = st.columns([1, 3])
 
-    # LEFT CELL: Project selector
+    # LEFT CELL: Project and period selectors
     left_cell = cols[0].container(
         border=True,
         height=500,
@@ -62,7 +62,30 @@ def render_all_projects_snapshot(df):
     )
 
     with left_cell:
-        st.markdown("### Select projects")
+        st.markdown("### Period")
+
+        # Period selection buttons (Stockpeer-style)
+        period_options = {
+            "3M": 3,
+            "6M": 6,
+            "YTD": "ytd",
+            "1Y": 12,
+            "All": "all"
+        }
+
+        # Create radio buttons for period selection
+        selected_period_key = st.radio(
+            "Select time period",
+            options=list(period_options.keys()),
+            index=3,  # Default to 1Y
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+
+        selected_period_value = period_options[selected_period_key]
+
+        st.markdown("---")
+        st.markdown("### Projects")
 
         # Add "All projects" option
         all_projects_label = "All projects (aggregated)"
@@ -91,6 +114,20 @@ def render_all_projects_snapshot(df):
         if not selected_projects:
             st.info("👆 Select at least one project to view the chart")
             return
+
+        # Apply period filter
+        if selected_period_value != "all":
+            max_period = df_copy["Period"].max()
+
+            if selected_period_value == "ytd":
+                # Year to date - from January 1st to max_period
+                start_of_year = pd.Timestamp(max_period.year, 1, 1)
+                df_copy = df_copy[df_copy["Period"] >= start_of_year]
+            else:
+                # Months back (3M, 6M, 1Y)
+                months_back = selected_period_value
+                start_period = max_period - pd.DateOffset(months=months_back)
+                df_copy = df_copy[df_copy["Period"] >= start_period]
 
         # Check if "All projects" is selected
         if all_projects_label in selected_projects:

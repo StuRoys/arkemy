@@ -7,10 +7,7 @@ st.set_page_config(
 )
 
 from period_translations.translations import t, load_translations
-from period_processors.project_report import (
-    render_project_sidebar_filters,
-    try_autoload_project_data
-)
+from period_processors.project_report import try_autoload_project_data
 from period_charts.project_snapshot import render_project_snapshot
 import pandas as pd
 
@@ -78,11 +75,8 @@ if "Period" in project_df.columns:
         st.warning(f"Could not convert Period to datetime: {str(e)}")
         project_df["Period"] = pd.Timestamp.now()
 
-# Apply sidebar filters
-filtered_df, filtered_period_info, selected_project = render_project_sidebar_filters(project_df)
-
 # Get the translated "All Projects" option
 all_projects_option = t('filter_all_projects')
 
-# Render the snapshot view
-render_project_snapshot(filtered_df, selected_project, all_projects_option)
+# Render the snapshot view (no sidebar filters - period selection is in the UI)
+render_project_snapshot(project_df, all_projects_option, all_projects_option)
