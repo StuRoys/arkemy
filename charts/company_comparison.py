@@ -301,7 +301,7 @@ def render_comparison_chart(
 
     # Update layout
     fig.update_layout(
-        title=f"{config['label']} Comparison",
+        title="",
         xaxis_title="",
         yaxis_title=y_title,
         barmode='group',
@@ -324,8 +324,6 @@ def render_comparison_tab(filtered_df: pd.DataFrame, filter_settings: dict = Non
         filtered_df: Filtered time records DataFrame from sidebar
         filter_settings: Dictionary of filter settings from sidebar
     """
-    st.subheader("Period Comparison")
-
     # Initialize session state keys if not present
     if 'comparison_type' not in st.session_state:
         st.session_state.comparison_type = 'Last 6 months vs previous 6 months'
@@ -350,10 +348,11 @@ def render_comparison_tab(filtered_df: pd.DataFrame, filter_settings: dict = Non
 
     with col1:
         comparison_type = st.selectbox(
-            "Comparison Type",
+            label="",
             options=comparison_options,
             index=comparison_options.index(st.session_state.comparison_type),
-            key='comparison_type_selector'
+            key='comparison_type_selector',
+            label_visibility="collapsed"
         )
         st.session_state.comparison_type = comparison_type
 
@@ -363,11 +362,12 @@ def render_comparison_tab(filtered_df: pd.DataFrame, filter_settings: dict = Non
 
     with col2:
         selected_metric = st.selectbox(
-            "Select metric to visualize:",
+            label="",
             options=list(metric_options.keys()),
             format_func=lambda x: metric_options[x],
             index=list(metric_options.keys()).index(st.session_state.comparison_selected_metric),
-            key='comparison_metric_selector'
+            key='comparison_metric_selector',
+            label_visibility="collapsed"
         )
         st.session_state.comparison_selected_metric = selected_metric
 
