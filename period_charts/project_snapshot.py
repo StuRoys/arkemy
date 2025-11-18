@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 from period_translations.translations import t
 from period_utils.chart_utils import prepare_project_dataframe
 
@@ -33,7 +34,7 @@ def render_single_project_snapshot(df, project_name):
         st.warning(f"No data found for project: {project_name}")
         return
 
-    st.info("Project snapshot view - coming soon")
+    st.info("💡 Switch to 'All Projects' in the sidebar to use the snapshot comparison view")
 
 
 def render_all_projects_snapshot(df):
@@ -46,4 +47,82 @@ def render_all_projects_snapshot(df):
         st.warning("No data available for the selected period")
         return
 
-    st.info("Project snapshot view - coming soon")
+    # Get unique projects sorted by total hours (descending)
+    project_totals = df_copy.groupby("Project Name")["Period Hours"].sum().sort_values(ascending=False)
+    available_projects = project_totals.index.tolist()
+
+    # Create Stockpeer-style layout: left cell (selector) + right cell (chart)
+    cols = st.columns([1, 3])
+
+    # LEFT CELL: Project selector
+    left_cell = cols[0].container(
+        border=True,
+        height=500,
+        vertical_alignment="top"
+    )
+
+    with left_cell:
+        st.markdown("### Select projects")
+
+        # Add "All projects" option
+        all_projects_label = "All projects (aggregated)"
+
+        # Default to top 5 projects
+        default_projects = available_projects[:5] if len(available_projects) >= 5 else available_projects
+
+        # Multiselect with all available projects
+        selected_projects = st.multiselect(
+            "Compare projects",
+            options=[all_projects_label] + available_projects,
+            default=default_projects,
+            placeholder="Choose projects to compare",
+            label_visibility="collapsed"
+        )
+
+    # RIGHT CELL: Chart
+    right_cell = cols[1].container(
+        border=True,
+        height=500,
+        vertical_alignment="center"
+    )
+
+    with right_cell:
+        # Handle selection
+        if not selected_projects:
+            st.info("👆 Select at least one project to view the chart")
+            return
+
+        # Check if "All projects" is selected
+        if all_projects_label in selected_projects:
+            # Aggregate all projects
+            plot_data = df_copy.groupby("Period", as_index=False)["Period Hours"].sum()
+            plot_data["Project Name"] = "All projects"
+        else:
+            # Filter for selected projects
+            plot_data = df_copy[df_copy["Project Name"].isin(selected_projects)].copy()
+
+        # Sort by period for chronological display
+        plot_data = plot_data.sort_values("Period")
+
+        # Create Altair line chart
+        chart = (
+            alt.Chart(plot_data)
+            .mark_line(point=True)
+            .encode(
+                alt.X("Period:T", title="Period", axis=alt.Axis(format="%b %Y")),
+                alt.Y("Period Hours:Q", title="Hours Worked", scale=alt.Scale(zero=False)),
+                alt.Color("Project Name:N", title="Project"),
+                alt.Tooltip([
+                    alt.Tooltip("Period:T", title="Period", format="%b %Y"),
+                    alt.Tooltip("Project Name:N", title="Project"),
+                    alt.Tooltip("Period Hours:Q", title="Hours", format=",.0f")
+                ])
+            )
+            .properties(
+                height=400,
+                title="Period Hours by Project"
+            )
+            .interactive()
+        )
+
+        st.altair_chart(chart, use_container_width=True)
