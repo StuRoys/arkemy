@@ -259,7 +259,7 @@ def render_comparison_chart(
         yaxis_title=y_title,
         barmode='group',
         showlegend=True,
-        height=400,
+        height=550,
         margin=dict(l=20, r=20, t=60, b=20),
         font=dict(size=14),
         hovermode='x unified'
@@ -347,19 +347,6 @@ def render_comparison_tab(filtered_df: pd.DataFrame, filter_settings: dict = Non
 
     # Calculate comparison
     comparison = calculate_comparison(period_a_metrics, period_b_metrics)
-
-    # Render summary cards
-    render_summary_cards(
-        comparison,
-        period_a_label,
-        period_b_label,
-        period_a_start,
-        period_a_end,
-        period_b_start,
-        period_b_end,
-        period_a_metrics,
-        period_b_metrics
-    )
 
     # Metric selector for chart
     metric_config = get_metric_config()
