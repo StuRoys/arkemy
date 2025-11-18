@@ -2,6 +2,7 @@
 import streamlit as st
 import os
 import glob
+import sys
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -103,19 +104,23 @@ if 'capacity_summary_loaded' not in st.session_state:
 if 'capacity_summary_df' not in st.session_state:
     st.session_state.capacity_summary_df = None
 
-# TEMP: Auto-load parquet file for testing (without user upload)
-from utils.test_data_loader import auto_load_test_data
+# Auto-load parquet file for testing (only with --test-data flag)
+# Usage: streamlit run main.py -- --test-data
+use_auto_load = '--test-data' in sys.argv
 
-data_dir = get_data_directory()
-if not st.session_state.get('csv_loaded', False):
-    result = auto_load_test_data(data_dir)
-    if result['success'] and result['transformed_df'] is not None:
-        st.session_state.transformed_df = result['transformed_df']
-        st.session_state.csv_loaded = True
-        if result['transformed_planned_df'] is not None:
-            st.session_state.transformed_planned_df = result['transformed_planned_df']
-            st.session_state.planned_csv_loaded = True
-        print(f"[MAIN] Auto-loaded: {result['file_loaded']}")
+if use_auto_load:
+    from utils.test_data_loader import auto_load_test_data
+
+    data_dir = get_data_directory()
+    if not st.session_state.get('csv_loaded', False):
+        result = auto_load_test_data(data_dir)
+        if result['success'] and result['transformed_df'] is not None:
+            st.session_state.transformed_df = result['transformed_df']
+            st.session_state.csv_loaded = True
+            if result['transformed_planned_df'] is not None:
+                st.session_state.transformed_planned_df = result['transformed_planned_df']
+                st.session_state.planned_csv_loaded = True
+            print(f"[MAIN] Auto-loaded: {result['file_loaded']}")
 
 # Set up app pages
 pages = [
