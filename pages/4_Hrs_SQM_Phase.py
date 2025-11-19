@@ -135,33 +135,31 @@ def render_upload_interface():
 
     return None
 
+# Check if SQM data is available
+if not st.session_state.get('sqm_available', False):
+    st.error("📂 Hrs/m²/Phase data not available")
+    st.info("Please select a dataset that includes an hrs/sqm/phase CSV file.")
+    st.stop()
+
 # Session state for SQM data
 if 'sqm_data' not in st.session_state:
     st.session_state.sqm_data = None
 
-# Handle data loading with modern pattern
-# If data already exists, use it directly (skip all upload logic)
-if st.session_state.sqm_data is not None:
-    df = st.session_state.sqm_data
-else:
-    # No data exists - try to get it
-    # Try to autoload data first
-    autoloaded_data = try_autoload_sqm_data()
-
-    if autoloaded_data is not None:
-        # Store autoloaded data in session state
-        st.session_state.sqm_data = autoloaded_data
-        df = autoloaded_data
-    else:
-        # No data found - show upload interface
-        render_upload_interface()
-
-        # If still no data after upload interface, return early
-        if st.session_state.sqm_data is None:
+# Load data from global CSV path if not already loaded
+if st.session_state.sqm_data is None:
+    csv_path = st.session_state.get('sqm_csv_path')
+    if csv_path:
+        try:
+            df = pd.read_csv(csv_path)
+            st.session_state.sqm_data = df
+        except Exception as e:
+            st.error(f"Failed to load SQM data: {str(e)}")
             st.stop()
-
-        # Use uploaded data
-        df = st.session_state.sqm_data
+    else:
+        st.error("SQM CSV path not found in session state")
+        st.stop()
+else:
+    df = st.session_state.sqm_data
 
 # Display data metrics and continue with analysis
 if df is not None:

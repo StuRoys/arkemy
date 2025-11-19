@@ -411,6 +411,9 @@ def render_sidebar_filters(df, planned_df=None):
         st.session_state.planned_csv_loaded = False
         st.session_state.data_loading_attempted = False
         st.rerun()
-    
-        
+
+    # Render reset button at bottom of sidebar (localhost only)
+    from utils.dataset_reset import render_dataset_indicator
+    render_dataset_indicator()
+
     return filtered_df, filtered_planned_df, filter_settings

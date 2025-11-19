@@ -29,24 +29,39 @@ st.subheader("🔍 " + t("snapshot_project").title())
 
 # Check if data already exists in session state
 if st.session_state.project_data is None:
-    # Try to autoload data first
-    autoloaded_data = try_autoload_project_data()
+    # First, check if global transformed_df is available (from dataset selection)
+    if st.session_state.get('csv_loaded', False) and st.session_state.transformed_df is not None:
+        # Import transformation function
+        from period_processors.project_report import transform_dataframes_to_project_report
 
-    if autoloaded_data is not None:
-        # Store autoloaded data in session state
-        st.session_state.project_data = autoloaded_data
-        st.session_state.period_report_project_data = autoloaded_data
-        project_df = autoloaded_data
+        # Transform global data to project report format
+        time_records = st.session_state.transformed_df
+        planned_records = st.session_state.get('transformed_planned_df')
+
+        transformed_data = transform_dataframes_to_project_report(time_records, planned_records)
+
+        if transformed_data is not None:
+            # Store transformed data in session state
+            st.session_state.project_data = transformed_data
+            st.session_state.period_report_project_data = transformed_data
+            project_df = transformed_data
+        else:
+            st.error("Failed to transform global data to project report format")
+            st.stop()
     else:
-        # No data found - show error message
-        st.error("📂 No project data found in /data directory")
-        st.markdown("""
-        **To view project snapshot, place a parquet file in the `/data` directory with naming pattern:**
-        - `*_regular.parquet` or `*_adjusted.parquet`
+        # Fallback: Try to autoload data (for production or if global data not available)
+        autoloaded_data = try_autoload_project_data()
 
-        Or load data in the **Project Report** page first - data is shared across pages.
-        """)
-        st.stop()
+        if autoloaded_data is not None:
+            # Store autoloaded data in session state
+            st.session_state.project_data = autoloaded_data
+            st.session_state.period_report_project_data = autoloaded_data
+            project_df = autoloaded_data
+        else:
+            # No data found - show error message
+            st.error("📂 No project data available")
+            st.info("Please load a dataset using the 'Change Dataset' button in the sidebar.")
+            st.stop()
 else:
     # Use existing data from session state
     project_df = st.session_state.project_data

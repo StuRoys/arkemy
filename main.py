@@ -3,6 +3,7 @@ import streamlit as st
 import os
 import glob
 from dotenv import load_dotenv
+from utils.localhost_selector import is_localhost
 
 # Load environment variables
 load_dotenv()
@@ -103,15 +104,34 @@ if 'capacity_summary_loaded' not in st.session_state:
 if 'capacity_summary_df' not in st.session_state:
     st.session_state.capacity_summary_df = None
 
-# Set up app pages
-pages = [
-    st.Page("pages/1_Analytics_Dashboard.py", title="Analytics Dashboard", icon="📊"),
-    st.Page("pages/2_Coworker_Report.py", title="Coworker Report", icon="👥"),
-    st.Page("pages/3_Project_Report.py", title="Project Report", icon="📁"),
-    st.Page("pages/6_Project_Snapshot.py", title="Project Snapshot", icon="🔍"),
-    st.Page("pages/4_Hrs_SQM_Phase.py", title="Hrs/m2/phase (beta)", icon="🏗️"),
-    st.Page("pages/5_Admin.py", title="Admin", icon="🛠️")
-]
+# ==========================================
+# CONDITIONAL NAVIGATION (Localhost vs Production)
+# ==========================================
+
+# Determine which pages to show based on environment and data load status
+if is_localhost() and not st.session_state.csv_loaded:
+    # Localhost mode + No data loaded: Show only dataset selection
+    pages = [
+        st.Page("pages/0_Dataset_Selection.py", title="Select Dataset", icon="📂")
+    ]
+else:
+    # Production mode OR data already loaded: Build page list based on data availability
+    pages = [
+        st.Page("pages/1_Analytics_Dashboard.py", title="Analytics Dashboard", icon="📊"),
+        st.Page("pages/3_Project_Report.py", title="Project Report", icon="📁"),
+        st.Page("pages/6_Project_Snapshot.py", title="Project Snapshot", icon="🔍"),
+        st.Page("pages/7_Cashflow_Analysis.py", title="Cashflow Analysis", icon="💰"),
+    ]
+
+    # Conditionally add CSV-dependent pages
+    if st.session_state.get('coworker_available', False):
+        pages.insert(1, st.Page("pages/2_Coworker_Report.py", title="Coworker Report", icon="👥"))
+
+    if st.session_state.get('sqm_available', False):
+        pages.append(st.Page("pages/4_Hrs_SQM_Phase.py", title="Hrs/m2/phase (beta)", icon="🏗️"))
+
+    # Admin page always available
+    pages.append(st.Page("pages/5_Admin.py", title="Admin", icon="🛠️"))
 
 # Set up navigation - this creates the sidebar automatically
 pg = st.navigation(pages)

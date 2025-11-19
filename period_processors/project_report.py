@@ -9,6 +9,149 @@ from period_charts.project_fees import render_project_fees_chart
 from period_charts.project_rate import render_project_rate_chart
 from utils.localhost_selector import is_localhost, render_localhost_file_selector
 
+def transform_dataframes_to_project_report(time_records_df=None, planned_records_df=None):
+    """
+    Transform already-loaded dataframes to Project Report CSV format.
+
+    Args:
+        time_records_df: DataFrame containing time_record data (actual work)
+        planned_records_df: DataFrame containing planned_record data (forecasting)
+
+    Returns:
+        DataFrame in Project Report format with columns:
+        - Project ID, Project Name, Period, Period Hours, Planned Hours, Period Fees, Planned Income
+    """
+    try:
+        # Ensure we have at least one dataframe
+        if (time_records_df is None or time_records_df.empty) and (planned_records_df is None or planned_records_df.empty):
+            st.warning("No time_record or planned_record data provided")
+            return None
+
+        # Create project + month aggregation manually
+        project_month_data = []
+
+        # Process time_records (actual work)
+        if time_records_df is not None and not time_records_df.empty:
+            time_records_copy = time_records_df.copy()
+
+            # Ensure required columns exist
+            required_cols = ['project_number', 'project_name', 'record_date']
+            missing_cols = [col for col in required_cols if col not in time_records_copy.columns]
+            if missing_cols:
+                st.error(f"Missing required columns in time_records: {missing_cols}")
+                return None
+
+            time_records_copy['Year'] = time_records_copy['record_date'].dt.year
+            time_records_copy['Month'] = time_records_copy['record_date'].dt.month
+
+            # Group by project + month + year
+            actual_agg = time_records_copy.groupby(['project_number', 'project_name', 'Year', 'Month']).agg({
+                'hours_used': 'sum',
+                'hours_billable': 'sum',
+                'fee_record': 'sum'
+            }).reset_index()
+
+            # Add period date
+            actual_agg['Period'] = pd.to_datetime(actual_agg[['Year', 'Month']].assign(day=1))
+
+            project_month_data.append(actual_agg)
+
+        # Process planned_records (planned work)
+        if planned_records_df is not None and not planned_records_df.empty:
+            planned_records_copy = planned_records_df.copy()
+
+            # Ensure required columns exist
+            required_cols = ['project_number', 'project_name', 'record_date']
+            missing_cols = [col for col in required_cols if col not in planned_records_copy.columns]
+            if missing_cols:
+                st.error(f"Missing required columns in planned_records: {missing_cols}")
+                return None
+
+            planned_records_copy['Year'] = planned_records_copy['record_date'].dt.year
+            planned_records_copy['Month'] = planned_records_copy['record_date'].dt.month
+
+            # Group by project + month + year
+            planned_agg = planned_records_copy.groupby(['project_number', 'project_name', 'Year', 'Month']).agg({
+                'planned_hours': 'sum',
+                'planned_fee': 'sum'
+            }).reset_index()
+
+            # Add period date
+            planned_agg['Period'] = pd.to_datetime(planned_agg[['Year', 'Month']].assign(day=1))
+
+            project_month_data.append(planned_agg)
+
+        if not project_month_data:
+            st.warning("No project+month data generated")
+            return None
+
+        # Merge actual and planned data
+        if len(project_month_data) == 2:
+            # Both actual and planned data exist - merge them
+            actual_df, planned_df_agg = project_month_data
+            monthly_data = pd.merge(
+                actual_df,
+                planned_df_agg,
+                on=['project_number', 'project_name', 'Year', 'Month', 'Period'],
+                how='outer'
+            )
+        else:
+            # Only one type exists
+            monthly_data = project_month_data[0]
+
+        # Fill NaN values with 0
+        numeric_cols = ['hours_used', 'hours_billable', 'fee_record', 'planned_hours', 'planned_fee']
+        for col in numeric_cols:
+            if col in monthly_data.columns:
+                monthly_data[col] = monthly_data[col].fillna(0)
+
+        if monthly_data.empty:
+            st.warning("No aggregated data generated from dataframes")
+            return None
+
+        # Transform to Project Report expected format
+        project_report_df = monthly_data.copy()
+
+        # Rename columns to Project Report expected format
+        column_mapping = {
+            'project_number': 'Project ID',
+            'project_name': 'Project Name',
+            'hours_used': 'Period Hours',
+            'hours_billable': 'Billable Hours',
+            'planned_hours': 'Planned Hours',
+            'fee_record': 'Period Fees Adjusted',
+            'planned_fee': 'Planned Income'
+        }
+
+        # Apply renaming only for columns that exist
+        existing_mapping = {k: v for k, v in column_mapping.items() if k in project_report_df.columns}
+        project_report_df = project_report_df.rename(columns=existing_mapping)
+
+        # Select only the columns Project Report expects
+        expected_columns = ['Project ID', 'Project Name', 'Period', 'Period Hours', 'Billable Hours', 'Planned Hours', 'Period Fees Adjusted', 'Planned Income']
+
+        # Fill missing columns with 0 or appropriate defaults
+        for col in expected_columns:
+            if col not in project_report_df.columns:
+                if col in ['Period Hours', 'Planned Hours', 'Billable Hours']:
+                    project_report_df[col] = 0.0
+                elif col in ['Period Fees Adjusted', 'Planned Income']:
+                    project_report_df[col] = 0.0
+                else:
+                    project_report_df[col] = ""
+
+        # Select and reorder columns
+        project_report_df = project_report_df[expected_columns]
+
+        # Sort by Project Name and Period for better readability
+        project_report_df = project_report_df.sort_values(['Project Name', 'Period'])
+
+        return project_report_df
+
+    except Exception as e:
+        st.error(f"Error transforming dataframes to project report format: {str(e)}")
+        return None
+
 def transform_parquet_to_project_report(parquet_path):
     """
     Transform unified parquet data to Project Report CSV format.
@@ -184,29 +327,9 @@ def get_data_directory():
     return project_data_dir
 
 def try_autoload_project_data():
-    """Try to autoload project data from data directory."""
-    # LOCALHOST MODE: Show file selector
-    if is_localhost():
-        selected_client, selected_file_path = render_localhost_file_selector(
-            session_prefix="project_",
-            file_extensions=('.parquet', '.pq'),
-            title="📂 Project Report Data (Localhost)"
-        )
-
-        if not selected_file_path:
-            # No file selected - return None to trigger "no data" message
-            return None
-
-        # Load and transform the selected parquet file
-        try:
-            transformed_df = transform_parquet_to_project_report(selected_file_path)
-            if transformed_df is not None and not transformed_df.empty:
-                return transformed_df
-        except Exception as e:
-            st.error(f"Could not transform {os.path.basename(selected_file_path)}: {str(e)}")
-            return None
-
-    # PRODUCTION MODE: Auto-load from /data
+    """Try to autoload project data from data directory (production mode only)."""
+    # PRODUCTION MODE ONLY: Auto-load from /data
+    # Localhost mode now uses global dataset selection via transformed_df
     data_dir = get_data_directory()
 
     # First, try to find and transform parquet files (preferred method)
@@ -715,7 +838,11 @@ def render_project_sidebar_filters(df):
                 st.info(f"{t('filter_showing_projects')} {len(valid_projects)} {t('filter_projects_created_between')} {start_date} {t('filter_and')} {end_date}")
             except Exception as e:
                 st.warning(f"{t('filter_creation_date_error')} {str(e)}")
-    
+
+    # Render reset button at bottom of sidebar (localhost only)
+    from utils.dataset_reset import render_dataset_indicator
+    render_dataset_indicator()
+
     return filtered_df, filtered_period_info, selected_project
 
 
@@ -723,32 +850,35 @@ def handle_project_upload():
     """Handle the upload of project CSV data and render charts and table."""
     # Check if data already exists in session state
     if st.session_state.project_data is None:
-        # Try to autoload data first
-        autoloaded_data = try_autoload_project_data()
-        
-        if autoloaded_data is not None:
-            # Store autoloaded data in session state
-            st.session_state.project_data = autoloaded_data
-            project_df = autoloaded_data
+        # First, check if global transformed_df is available (from dataset selection)
+        if st.session_state.get('csv_loaded', False) and st.session_state.transformed_df is not None:
+            # Transform global data to project report format
+            time_records = st.session_state.transformed_df
+            planned_records = st.session_state.get('transformed_planned_df')
+
+            transformed_data = transform_dataframes_to_project_report(time_records, planned_records)
+
+            if transformed_data is not None:
+                # Store transformed data in session state
+                st.session_state.project_data = transformed_data
+                st.session_state.period_report_project_data = transformed_data
+                project_df = transformed_data
+            else:
+                st.error("Failed to transform global data to project report format")
+                return
         else:
-            # No data found - show error message
-            st.error("📂 No project data found in /data directory")
-            st.markdown("""
-            **To view project reports, place a CSV file in the `/data` directory with one of these naming patterns:**
-            - `*project_report*.csv`
-            - `project*.csv`
-            - `prosjekt*.csv`
-            
-            **Expected CSV structure:**
-            - Period
-            - Project ID
-            - Project Name
-            - Period Hours
-            - Planned Hours
-            - Period Fees
-            - Planned Income
-            """)
-            return
+            # Fallback: Try to autoload data (for production or if global data not available)
+            autoloaded_data = try_autoload_project_data()
+
+            if autoloaded_data is not None:
+                # Store autoloaded data in session state
+                st.session_state.project_data = autoloaded_data
+                project_df = autoloaded_data
+            else:
+                # No data found - show error message
+                st.error("📂 No project data available")
+                st.info("Please load a dataset using the 'Change Dataset' button in the sidebar.")
+                return
     else:
         # Use existing data from session state
         project_df = st.session_state.project_data

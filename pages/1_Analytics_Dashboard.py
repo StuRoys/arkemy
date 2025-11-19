@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import glob
 from pathlib import Path
-from utils.localhost_selector import is_localhost, render_localhost_file_selector
+from utils.localhost_selector import is_localhost
 
 # Set page configuration
 st.set_page_config(
@@ -82,36 +82,16 @@ def render_data_loading_interface():
     debug_mode = is_debug_mode()
     is_admin = is_admin_authenticated()
 
-    # LOCALHOST MODE: Always show file selector, check if we need to reload data
+    # LOCALHOST MODE: Data should already be loaded via dataset selection page
     if is_localhost():
-        selected_client, selected_file_path = render_localhost_file_selector(
-            session_prefix="",
-            file_extensions=('.parquet', '.pq')
-        )
-
-        # No file selected (either placeholder or client has no files)
-        if not selected_file_path:
-            # Show current data if any is loaded, otherwise show nothing
-            if st.session_state.csv_loaded and st.session_state.transformed_df is not None:
-                return True
-            return False
-
-        # Check if this file is already loaded
-        if (st.session_state.csv_loaded and
-            st.session_state.transformed_df is not None and
-            st.session_state.loaded_file_path == selected_file_path):
-            # Data already loaded for this file, proceed to dashboard
+        # Check if data is loaded (should be loaded via 0_Dataset_Selection.py)
+        if st.session_state.csv_loaded and st.session_state.transformed_df is not None:
+            # Data already loaded, proceed to dashboard
             return True
-
-        # Need to load new file (either first load or file changed)
-        loader = UnifiedDataLoader()
-        loading_results = loader.load_unified_data(selected_file_path, show_debug=debug_mode, silent_mode=False)
-        loading_results['loading_method'] = 'localhost_selection'
-        loading_results['data_source_path'] = os.path.dirname(selected_file_path)
-
-        # Track which file was loaded
-        if loading_results.get('success'):
-            st.session_state.loaded_file_path = selected_file_path
+        else:
+            # This shouldn't happen due to conditional navigation, but handle it gracefully
+            st.error("📂 No data loaded. Please use the 'Change Dataset' button in the sidebar.")
+            return False
     else:
         # PRODUCTION MODE: Check if data is already loaded
         if st.session_state.csv_loaded and st.session_state.transformed_df is not None:
