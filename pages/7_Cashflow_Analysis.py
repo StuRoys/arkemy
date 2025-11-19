@@ -14,12 +14,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Page header
-st.subheader("💰 Cashflow Analysis")
-
 # Access unfiltered data from session state
 if not st.session_state.get('csv_loaded', False) or st.session_state.transformed_df is None:
-    st.error("📂 No data loaded. Please load data from the Analytics Dashboard.")
+    st.error("No data loaded. Please load data from the Analytics Dashboard.")
     st.stop()
 
 # Get unfiltered data (override sidebar filters for company-wide view)
