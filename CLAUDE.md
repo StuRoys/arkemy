@@ -4,37 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 🚨 CRITICAL - READ FIRST
 - **Project Location**: `~/code/arkemy_app/arkemy`
-- **NEVER commit directly to main branch** (production-only)
-- **Current development**: Work in `develop` branch for safety
+- **Branch**: Work directly on `main` branch
 - **Test command**: `streamlit run main.py`
 - **Repository name**: `arkemy` (clean, professional)
 
-## 🚀 GIT WORKFLOW - PRODUCTION SAFETY
+## 🚀 GIT WORKFLOW - SIMPLIFIED
 **User is vibe coding, not a Git person - I handle ALL git operations**
 
 ### Branch Strategy
-- **main** = Production branch (end users see this)
-- **develop** = Development branch (work happens here)
-- **ALWAYS work on develop branch unless explicitly merging to production**
-
-### Production Deployment Rules
-**ONLY push to main branch when user says EXACTLY:**
-- "Ship to production"
-- "Deploy to prod"
-- "Push to main"
-- "Ready for users"
-
-**ALL other feedback stays on develop:**
-- "This works" ≠ production ready
-- "Looks good" = keep on develop
-- "Test this" = keep on develop
-- Any other positive feedback = keep on develop
+- **main** = Production branch (work happens here, end users see this)
+- **feature branches** = For experimental features (merge to main when ready)
 
 ### My Git Responsibilities
 1. **Always check current branch** before any operations
-2. **Always work on develop branch** unless merging to main
-3. **Test locally first** before any main branch merge
-4. **Ask for confirmation** if production intent is unclear
+2. **Work on main branch** for normal development
+3. **Create feature branches** for larger experimental features
+4. **Test locally first** before committing
 5. **Handle all git commands** - user never needs to know Git
 6. **NEVER deploy without explicit permission** - see Deployment Rules below
 
