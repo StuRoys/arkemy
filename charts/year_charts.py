@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from utils.chart_helpers import create_standardized_customdata
-from utils.chart_styles import get_metric_options
+from utils.chart_styles import get_metric_options, get_theme_color_scale
 
 def render_year_tab(filtered_df, aggregate_by_year, render_chart, get_category_colors):
     """
@@ -49,21 +49,13 @@ def render_year_tab(filtered_df, aggregate_by_year, render_chart, get_category_c
     # Sort years chronologically
     sorted_years = year_agg.sort_values("Year")
     
-    # Create the bar chart with color gradient and standardized custom data
-    # Use red gradient for cost, red-to-green for profit metrics (to show negative as red), green for others
-    if selected_metric == "Total cost":
-        color_scale = "Reds"
-    elif selected_metric in ["Total profit", "Profit margin %"]:
-        color_scale = "RdYlGn"  # Red-Yellow-Green scale (red for negative, green for positive)
-    else:
-        color_scale = "Greens"
-    
+    # Create the bar chart with theme color gradient and standardized custom data
     fig_bar = px.bar(
         sorted_years,
         x="Year",
         y=metric_column,
         color=metric_column,
-        color_continuous_scale=color_scale,
+        color_continuous_scale=get_theme_color_scale(),
         title=f"{selected_metric} by Year",
         custom_data=create_standardized_customdata(sorted_years)
     )

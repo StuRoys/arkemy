@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 import plotly.colors as pc
 from datetime import datetime
 import numpy as np
-from utils.chart_styles import SUM_METRICS
+from utils.chart_styles import SUM_METRICS, get_theme_color_scale
 
 
 def build_treemap_texttemplate(metric, has_percentage_column):
@@ -282,16 +282,8 @@ def create_single_metric_chart(df, metric, title="", chart_type="bar", x_field="
     Returns:
         Plotly figure
     """
-    # Choose color scheme based on metric type
-    if "cost" in metric.lower():
-        color_scale = "Oranges"
-    elif "profit" in metric.lower():
-        # For profit, use a diverging color scale to handle negative values
-        color_scale = "RdYlGn"  # Red-Yellow-Green scale
-    elif "Planned" in metric:
-        color_scale = "Blues"
-    else:
-        color_scale = "Greens"
+    # Use theme color scale for all metrics
+    color_scale = get_theme_color_scale()
     
     # For bar charts
     if chart_type == "bar":

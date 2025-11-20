@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from utils.chart_helpers import create_standardized_customdata
-from utils.chart_styles import get_metric_options, initialize_analytics_metric_state
+from utils.chart_styles import get_metric_options, initialize_analytics_metric_state, get_theme_color_scale
 
 def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_chart, get_category_colors):
     """
@@ -353,7 +353,7 @@ def render_customer_group_tab(filtered_df, aggregate_by_customer_group, render_c
                 x="customer_group",
                 y=metric_column,
                 color=metric_column,
-                color_continuous_scale="Blues",
+                color_continuous_scale=get_theme_color_scale(),
                 title="",
                 custom_data=create_standardized_customdata(limited_groups)
             )

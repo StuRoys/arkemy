@@ -5,7 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.colors as pc
 from utils.chart_helpers import create_standardized_customdata, build_treemap_texttemplate
-from utils.chart_styles import get_metric_options, initialize_analytics_metric_state, SUM_METRICS, create_column_config
+from utils.chart_styles import get_metric_options, initialize_analytics_metric_state, SUM_METRICS, create_column_config, get_theme_color_scale
 from utils.processors import get_all_tag_columns, aggregate_by_project_tag, get_project_tag_columns_with_labels, add_percentage_columns
 from utils.tag_manager import get_tag_display_name
 
@@ -195,8 +195,9 @@ def render_activity_tab(filtered_df, aggregate_by_activity, render_chart, get_ca
             else:
                 normalized = [0.5] * len(values_list)
 
-            # Get Reds color scale for activities
-            colors_scale = pc.sample_colorscale("Reds", normalized)
+            # Get theme color scale for activities
+            theme_color_scale = get_theme_color_scale()
+            colors_scale = pc.sample_colorscale(theme_color_scale, normalized)
 
             # Build text template based on whether percentage exists
             pct_column = f'{metric_column}_pct'
@@ -253,7 +254,7 @@ def render_activity_tab(filtered_df, aggregate_by_activity, render_chart, get_ca
                 x=selected_tag_column,
                 y=metric_column,
                 color=metric_column,
-                color_continuous_scale="Reds",
+                color_continuous_scale=get_theme_color_scale(),
                 title="",
                 custom_data=create_standardized_customdata(limited_activities)
             )

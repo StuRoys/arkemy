@@ -5,7 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.colors as pc
 from utils.chart_helpers import create_standardized_customdata, create_single_metric_chart
-from utils.chart_styles import get_metric_options, initialize_analytics_metric_state
+from utils.chart_styles import get_metric_options, initialize_analytics_metric_state, get_theme_color_scale
 
 def render_people_tab(filtered_df, aggregate_by_person, render_chart, get_category_colors):
     """
@@ -109,7 +109,7 @@ def render_people_tab(filtered_df, aggregate_by_person, render_chart, get_catego
                 x="person_name",
                 y=metric_column,
                 color=metric_column,
-                color_continuous_scale="Blues",
+                color_continuous_scale=get_theme_color_scale(),
                 title="",
                 custom_data=create_standardized_customdata(limited_people)
             )

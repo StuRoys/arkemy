@@ -525,21 +525,39 @@ def get_comparison_type(comparison_pair):
 
 def apply_chart_style(fig, chart_type="default"):
     """
-    Apply consistent styling to Plotly figures
-    
+    Apply consistent styling to Plotly figures using Streamlit theme
+
     Args:
         fig: Plotly figure object
         chart_type: Type of chart for specific styling (default, customer, project, etc.)
-    
+
     Returns:
         Styled Plotly figure
     """
+    # Read theme values from Streamlit config
+    try:
+        theme_font = st.get_option("theme.font")
+        theme_text_color = st.get_option("theme.textColor")
+        theme_bg_color = st.get_option("theme.backgroundColor")
+
+        # Extract font family from theme (may include URL for web fonts)
+        if theme_font and ":" in theme_font:
+            # Format: "'Font Name':URL"
+            font_family = theme_font.split(":")[0].strip("'\"")
+        else:
+            font_family = theme_font if theme_font else FONT_FAMILY
+    except Exception:
+        # Fallback to hardcoded values if theme not available
+        font_family = FONT_FAMILY
+        theme_text_color = "#e2e8f0"
+        theme_bg_color = "#1d293d"
+
     # Check the chart type of the figure
     if fig.data and hasattr(fig.data[0], 'type'):
         chart_vis_type = fig.data[0].type
     else:
         chart_vis_type = "unknown"
-    
+
     # Apply specific styling based on the chart visualization type
     if chart_vis_type == "treemap":
         fig.update_traces(
@@ -555,24 +573,26 @@ def apply_chart_style(fig, chart_type="default"):
         fig.update_traces(
             #marker=BAR_MARKER
         )
-    
-    # Apply consistent layout
+
+    # Apply consistent layout with theme values
     fig.update_layout(
         height=CHART_HEIGHT,
         margin=CHART_MARGINS,
         font=dict(
-            family=FONT_FAMILY,
-            size=TICK_FONT_SIZE
+            family=font_family,
+            size=TICK_FONT_SIZE,
+            color=theme_text_color
         ),
         title=dict(
             font=dict(
-                family=FONT_FAMILY,
-                size=TITLE_FONT_SIZE
+                family=font_family,
+                size=TITLE_FONT_SIZE,
+                color=theme_text_color
             )
         ),
         hoverlabel=dict(
             font_size=20,
-            font_family=FONT_FAMILY
+            font_family=font_family
         ),
         # No colorbar needed
     )
@@ -656,16 +676,67 @@ def render_chart(fig, chart_type="default"):
         unsafe_allow_html=True
     )
 
-    # Render the chart
-    st.plotly_chart(fig, use_container_width=True)
+    # Render the chart with Streamlit theme
+    st.plotly_chart(fig, use_container_width=True, theme="streamlit")
+
+def get_theme_color_scale():
+    """
+    Get a color scale based on the theme's primary color.
+    Creates a gradient from light to dark shades of the primary color.
+
+    Returns:
+        tuple: (color_scale_name, color_scale_list)
+            - color_scale_name: String name for Plotly continuous scale
+            - color_scale_list: List of color values for discrete use
+    """
+    try:
+        primary_color = st.get_option("theme.primaryColor")
+
+        if not primary_color:
+            raise ValueError("No primary color defined")
+
+        # Convert hex to RGB
+        primary_color = primary_color.lstrip('#')
+        r, g, b = tuple(int(primary_color[i:i+2], 16) for i in (0, 2, 4))
+
+        # Create a custom color scale from light to dark
+        # Generate 9 shades from very light to very dark
+        color_scale_list = [
+            f'rgb({int(r + (255-r)*0.7)}, {int(g + (255-g)*0.7)}, {int(b + (255-b)*0.7)})',  # Very light
+            f'rgb({int(r + (255-r)*0.5)}, {int(g + (255-g)*0.5)}, {int(b + (255-b)*0.5)})',  # Light
+            f'rgb({int(r + (255-r)*0.3)}, {int(g + (255-g)*0.3)}, {int(b + (255-b)*0.3)})',  # Medium light
+            f'rgb({r}, {g}, {b})',  # Primary color
+            f'rgb({int(r*0.85)}, {int(g*0.85)}, {int(b*0.85)})',  # Medium dark
+            f'rgb({int(r*0.7)}, {int(g*0.7)}, {int(b*0.7)})',  # Dark
+            f'rgb({int(r*0.55)}, {int(g*0.55)}, {int(b*0.55)})',  # Darker
+            f'rgb({int(r*0.4)}, {int(g*0.4)}, {int(b*0.4)})',  # Very dark
+            f'rgb({int(r*0.25)}, {int(g*0.25)}, {int(b*0.25)})'   # Darkest
+        ]
+
+        # For Plotly continuous color scale, return the list
+        return color_scale_list
+
+    except Exception:
+        # Fallback to a default purple scale if theme not available
+        return [
+            'rgb(234, 228, 255)',  # Very light purple
+            'rgb(213, 201, 255)',  # Light purple
+            'rgb(192, 174, 255)',  # Medium light purple
+            'rgb(97, 95, 255)',    # Primary purple (#615fff)
+            'rgb(82, 81, 217)',    # Medium dark purple
+            'rgb(68, 67, 179)',    # Dark purple
+            'rgb(53, 52, 140)',    # Darker purple
+            'rgb(39, 38, 102)',    # Very dark purple
+            'rgb(24, 24, 64)'      # Darkest purple
+        ]
 
 def get_category_colors(chart_type):
     """
     Get the appropriate colors for a chart type
-    
+
     Args:
         chart_type: Type of chart
-    
+
     Returns:
         List of colors for the chart
     """

@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from utils.chart_helpers import create_standardized_customdata
-from utils.chart_styles import get_metric_options, initialize_analytics_metric_state
+from utils.chart_styles import get_metric_options, initialize_analytics_metric_state, get_theme_color_scale
 from utils.processors import get_all_tag_columns, get_project_tag_columns, aggregate_by_project_tag, get_project_tag_columns_with_labels
 from utils.tag_manager import get_tag_display_name
 
@@ -197,8 +197,9 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
             else:
                 normalized = [0.5] * len(values_list)
 
-            # Get Greens color scale
-            colors_scale = pc.sample_colorscale("Greens", normalized)
+            # Get theme color scale
+            theme_color_scale = get_theme_color_scale()
+            colors_scale = pc.sample_colorscale(theme_color_scale, normalized)
 
             # Build text template based on whether percentage exists
             from utils.chart_helpers import build_treemap_texttemplate
@@ -256,7 +257,7 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
                 x=selected_tag_column,
                 y=metric_column,
                 color=metric_column,
-                color_continuous_scale="Greens",
+                color_continuous_scale=get_theme_color_scale(),
                 title="",
                 custom_data=create_standardized_customdata(limited_project_types)
             )
