@@ -367,38 +367,41 @@ def aggregate_by_customer(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         Dataframe with customer aggregations
     """
-    customer_agg = df.groupby(["customer_number", "customer_name"]).agg({
+    customer_agg = df.groupby(["customer_number", "customer_name"], dropna=False).agg({
         "hours_used": "sum",
         "hours_billable": "sum",
         "project_number": "nunique"
     }).reset_index()
-    
+
+    # Replace NaN customer_name values with "Unknown Customer" for display
+    customer_agg["customer_name"] = customer_agg["customer_name"].fillna("Unknown Customer")
+
     customer_agg["Non-billable hours"] = customer_agg["hours_used"] - customer_agg["hours_billable"]
     customer_agg["Billability %"] = (customer_agg["hours_billable"] / customer_agg["hours_used"] * 100).round(2)
 
     # Add fee (new approach with fallback)
     if "fee_record" in df.columns:
-        fee_by_customer = df.groupby("customer_number")["fee_record"].sum().reset_index(name="Fee")
+        fee_by_customer = df.groupby("customer_number", dropna=False)["fee_record"].sum().reset_index(name="Fee")
         customer_agg = pd.merge(customer_agg, fee_by_customer, on="customer_number")
     elif "billable_rate_record" in df.columns:
         # Fallback to old calculation
-        fee_by_customer = df.groupby("customer_number").apply(
+        fee_by_customer = df.groupby("customer_number", dropna=False).apply(
             lambda x: (x["hours_billable"] * x["billable_rate_record"]).sum()
         ).reset_index(name="Fee")
         customer_agg = pd.merge(customer_agg, fee_by_customer, on="customer_number")
     else:
         customer_agg["Fee"] = 0
-    
+
     # Add cost
     if "cost_record" in df.columns:
-        cost_by_customer = df.groupby("customer_number")["cost_record"].sum().reset_index(name="Total cost")
+        cost_by_customer = df.groupby("customer_number", dropna=False)["cost_record"].sum().reset_index(name="Total cost")
         customer_agg = pd.merge(customer_agg, cost_by_customer, on="customer_number")
     else:
         customer_agg["Total cost"] = 0
-    
+
     # Add profit
     if "profit_record" in df.columns:
-        profit_by_customer = df.groupby("customer_number")["profit_record"].sum().reset_index(name="Total profit")
+        profit_by_customer = df.groupby("customer_number", dropna=False)["profit_record"].sum().reset_index(name="Total profit")
         customer_agg = pd.merge(customer_agg, profit_by_customer, on="customer_number")
     else:
         customer_agg["Total profit"] = 0
@@ -515,14 +518,17 @@ def aggregate_by_project(df: pd.DataFrame) -> pd.DataFrame:
     # Check if Project type column exists
     if "project_tag" in df.columns:
         # Use all three columns if Project type exists
-        project_agg = df.groupby(["project_number", "project_name", "project_tag"]).agg({
+        # dropna=False ensures records with NULL project_tag are included
+        project_agg = df.groupby(["project_number", "project_name", "project_tag"], dropna=False).agg({
             "hours_used": "sum",
             "hours_billable": "sum",
             "person_name": "nunique"
         }).reset_index()
+        # Replace NaN project_tag values with "Untagged" for display
+        project_agg["project_tag"] = project_agg["project_tag"].fillna("Untagged")
     else:
         # Only use Project number and Project columns if Project type doesn't exist
-        project_agg = df.groupby(["project_number", "project_name"]).agg({
+        project_agg = df.groupby(["project_number", "project_name"], dropna=False).agg({
             "hours_used": "sum",
             "hours_billable": "sum",
             "person_name": "nunique"
@@ -536,27 +542,27 @@ def aggregate_by_project(df: pd.DataFrame) -> pd.DataFrame:
     
     # Add fee (new approach with fallback)
     if "fee_record" in df.columns:
-        fee_by_project = df.groupby("project_number")["fee_record"].sum().reset_index(name="Fee")
+        fee_by_project = df.groupby("project_number", dropna=False)["fee_record"].sum().reset_index(name="Fee")
         project_agg = pd.merge(project_agg, fee_by_project, on="project_number")
     elif "billable_rate_record" in df.columns:
         # Fallback to old calculation
-        fee_by_project = df.groupby("project_number").apply(
+        fee_by_project = df.groupby("project_number", dropna=False).apply(
             lambda x: (x["hours_billable"] * x["billable_rate_record"]).sum()
         ).reset_index(name="Fee")
         project_agg = pd.merge(project_agg, fee_by_project, on="project_number")
     else:
         project_agg["Fee"] = 0
-    
+
     # Add cost
     if "cost_record" in df.columns:
-        cost_by_project = df.groupby("project_number")["cost_record"].sum().reset_index(name="Total cost")
+        cost_by_project = df.groupby("project_number", dropna=False)["cost_record"].sum().reset_index(name="Total cost")
         project_agg = pd.merge(project_agg, cost_by_project, on="project_number")
     else:
         project_agg["Total cost"] = 0
-    
+
     # Add profit
     if "profit_record" in df.columns:
-        profit_by_project = df.groupby("project_number")["profit_record"].sum().reset_index(name="Total profit")
+        profit_by_project = df.groupby("project_number", dropna=False)["profit_record"].sum().reset_index(name="Total profit")
         project_agg = pd.merge(project_agg, profit_by_project, on="project_number")
     else:
         project_agg["Total profit"] = 0
@@ -596,12 +602,15 @@ def aggregate_by_project_tag(df: pd.DataFrame, tag_column: str = "project_tag") 
     if tag_column not in df.columns:
         return pd.DataFrame()
 
-    project_tag_agg = df.groupby([tag_column]).agg({
+    project_tag_agg = df.groupby([tag_column], dropna=False).agg({
         "hours_used": "sum",
         "hours_billable": "sum",
         "project_number": "nunique",
         "person_name": "nunique"
     }).reset_index()
+
+    # Replace NaN tag values with "Untagged" for display
+    project_tag_agg[tag_column] = project_tag_agg[tag_column].fillna("Untagged")
 
     project_tag_agg["Non-billable hours"] = project_tag_agg["hours_used"] - project_tag_agg["hours_billable"]
     project_tag_agg["Billability %"] = (project_tag_agg["hours_billable"] / project_tag_agg["hours_used"] * 100).round(2)
@@ -612,11 +621,11 @@ def aggregate_by_project_tag(df: pd.DataFrame, tag_column: str = "project_tag") 
 
     # Add fee (new approach with fallback)
     if "fee_record" in df.columns:
-        fee_by_tag = df.groupby(tag_column)["fee_record"].sum().reset_index(name="Fee")
+        fee_by_tag = df.groupby(tag_column, dropna=False)["fee_record"].sum().reset_index(name="Fee")
         project_tag_agg = pd.merge(project_tag_agg, fee_by_tag, on=tag_column)
     elif "billable_rate_record" in df.columns:
         # Fallback to old calculation
-        fee_by_tag = df.groupby(tag_column).apply(
+        fee_by_tag = df.groupby(tag_column, dropna=False).apply(
             lambda x: (x["hours_billable"] * x["billable_rate_record"]).sum()
         ).reset_index(name="Fee")
         project_tag_agg = pd.merge(project_tag_agg, fee_by_tag, on=tag_column)
@@ -625,14 +634,14 @@ def aggregate_by_project_tag(df: pd.DataFrame, tag_column: str = "project_tag") 
 
     # Add cost
     if "cost_record" in df.columns:
-        cost_by_tag = df.groupby(tag_column)["cost_record"].sum().reset_index(name="Total cost")
+        cost_by_tag = df.groupby(tag_column, dropna=False)["cost_record"].sum().reset_index(name="Total cost")
         project_tag_agg = pd.merge(project_tag_agg, cost_by_tag, on=tag_column)
     else:
         project_tag_agg["Total cost"] = 0
 
     # Add profit
     if "profit_record" in df.columns:
-        profit_by_tag = df.groupby(tag_column)["profit_record"].sum().reset_index(name="Total profit")
+        profit_by_tag = df.groupby(tag_column, dropna=False)["profit_record"].sum().reset_index(name="Total profit")
         project_tag_agg = pd.merge(project_tag_agg, profit_by_tag, on=tag_column)
     else:
         project_tag_agg["Total profit"] = 0
@@ -675,43 +684,46 @@ def aggregate_by_phase(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         Dataframe with phase aggregations
     """
-    phase_agg = df.groupby(["phase_tag"]).agg({
+    phase_agg = df.groupby(["phase_tag"], dropna=False).agg({
         "hours_used": "sum",
         "hours_billable": "sum",
         "project_number": "nunique",
         "person_name": "nunique"
     }).reset_index()
-    
+
+    # Replace NaN phase_tag values with "No Phase" for display
+    phase_agg["phase_tag"] = phase_agg["phase_tag"].fillna("No Phase")
+
     phase_agg["Non-billable hours"] = phase_agg["hours_used"] - phase_agg["hours_billable"]
     phase_agg["Billability %"] = (phase_agg["hours_billable"] / phase_agg["hours_used"] * 100).round(2)
     phase_agg.rename(columns={
         "project_number": "Number of projects",
         "person_name": "Number of people"
     }, inplace=True)
-    
+
     # Add fee (new approach with fallback)
     if "fee_record" in df.columns:
-        fee_by_phase = df.groupby("phase_tag")["fee_record"].sum().reset_index(name="Fee")
+        fee_by_phase = df.groupby("phase_tag", dropna=False)["fee_record"].sum().reset_index(name="Fee")
         phase_agg = pd.merge(phase_agg, fee_by_phase, on="phase_tag")
     elif "billable_rate_record" in df.columns:
         # Fallback to old calculation
-        fee_by_phase = df.groupby("phase_tag").apply(
+        fee_by_phase = df.groupby("phase_tag", dropna=False).apply(
             lambda x: (x["hours_billable"] * x["billable_rate_record"]).sum()
         ).reset_index(name="Fee")
         phase_agg = pd.merge(phase_agg, fee_by_phase, on="phase_tag")
     else:
         phase_agg["Fee"] = 0
-    
+
     # Add cost
     if "cost_record" in df.columns:
-        cost_by_phase = df.groupby("phase_tag")["cost_record"].sum().reset_index(name="Total cost")
+        cost_by_phase = df.groupby("phase_tag", dropna=False)["cost_record"].sum().reset_index(name="Total cost")
         phase_agg = pd.merge(phase_agg, cost_by_phase, on="phase_tag")
     else:
         phase_agg["Total cost"] = 0
-    
+
     # Add profit
     if "profit_record" in df.columns:
-        profit_by_phase = df.groupby("phase_tag")["profit_record"].sum().reset_index(name="Total profit")
+        profit_by_phase = df.groupby("phase_tag", dropna=False)["profit_record"].sum().reset_index(name="Total profit")
         phase_agg = pd.merge(phase_agg, profit_by_phase, on="phase_tag")
     else:
         phase_agg["Total profit"] = 0
@@ -745,43 +757,46 @@ def aggregate_by_price_model(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         Dataframe with price model aggregations
     """
-    price_model_agg = df.groupby(["price_model_type"]).agg({
+    price_model_agg = df.groupby(["price_model_type"], dropna=False).agg({
         "hours_used": "sum",
         "hours_billable": "sum",
         "project_number": "nunique",
         "person_name": "nunique"
     }).reset_index()
-    
+
+    # Replace NaN price_model_type values with "No Price Model" for display
+    price_model_agg["price_model_type"] = price_model_agg["price_model_type"].fillna("No Price Model")
+
     price_model_agg["Non-billable hours"] = price_model_agg["hours_used"] - price_model_agg["hours_billable"]
     price_model_agg["Billability %"] = (price_model_agg["hours_billable"] / price_model_agg["hours_used"] * 100).round(2)
     price_model_agg.rename(columns={
         "project_number": "Number of projects",
         "person_name": "Number of people"
     }, inplace=True)
-    
+
     # Add fee (new approach with fallback)
     if "fee_record" in df.columns:
-        fee_by_price_model = df.groupby("price_model_type")["fee_record"].sum().reset_index(name="Fee")
+        fee_by_price_model = df.groupby("price_model_type", dropna=False)["fee_record"].sum().reset_index(name="Fee")
         price_model_agg = pd.merge(price_model_agg, fee_by_price_model, on="price_model_type")
     elif "billable_rate_record" in df.columns:
         # Fallback to old calculation
-        fee_by_price_model = df.groupby("price_model_type").apply(
+        fee_by_price_model = df.groupby("price_model_type", dropna=False).apply(
             lambda x: (x["hours_billable"] * x["billable_rate_record"]).sum()
         ).reset_index(name="Fee")
         price_model_agg = pd.merge(price_model_agg, fee_by_price_model, on="price_model_type")
     else:
         price_model_agg["Fee"] = 0
-    
+
     # Add cost
     if "cost_record" in df.columns:
-        cost_by_price_model = df.groupby("price_model_type")["cost_record"].sum().reset_index(name="Total cost")
+        cost_by_price_model = df.groupby("price_model_type", dropna=False)["cost_record"].sum().reset_index(name="Total cost")
         price_model_agg = pd.merge(price_model_agg, cost_by_price_model, on="price_model_type")
     else:
         price_model_agg["Total cost"] = 0
-    
+
     # Add profit
     if "profit_record" in df.columns:
-        profit_by_price_model = df.groupby("price_model_type")["profit_record"].sum().reset_index(name="Total profit")
+        profit_by_price_model = df.groupby("price_model_type", dropna=False)["profit_record"].sum().reset_index(name="Total profit")
         price_model_agg = pd.merge(price_model_agg, profit_by_price_model, on="price_model_type")
     else:
         price_model_agg["Total profit"] = 0
@@ -816,43 +831,46 @@ def aggregate_by_activity(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         Dataframe with activity aggregations
     """
-    activity_agg = df.groupby(["activity_tag"]).agg({
+    activity_agg = df.groupby(["activity_tag"], dropna=False).agg({
         "hours_used": "sum",
         "hours_billable": "sum",
         "project_number": "nunique",
         "person_name": "nunique"
     }).reset_index()
-    
+
+    # Replace NaN activity_tag values with "No Activity" for display
+    activity_agg["activity_tag"] = activity_agg["activity_tag"].fillna("No Activity")
+
     activity_agg["Non-billable hours"] = activity_agg["hours_used"] - activity_agg["hours_billable"]
     activity_agg["Billability %"] = (activity_agg["hours_billable"] / activity_agg["hours_used"] * 100).round(2)
     activity_agg.rename(columns={
         "project_number": "Number of projects",
         "person_name": "Number of people"
     }, inplace=True)
-    
+
     # Add fee (new approach with fallback)
     if "fee_record" in df.columns:
-        fee_by_activity = df.groupby("activity_tag")["fee_record"].sum().reset_index(name="Fee")
+        fee_by_activity = df.groupby("activity_tag", dropna=False)["fee_record"].sum().reset_index(name="Fee")
         activity_agg = pd.merge(activity_agg, fee_by_activity, on="activity_tag")
     elif "billable_rate_record" in df.columns:
         # Fallback to old calculation
-        fee_by_activity = df.groupby("activity_tag").apply(
+        fee_by_activity = df.groupby("activity_tag", dropna=False).apply(
             lambda x: (x["hours_billable"] * x["billable_rate_record"]).sum()
         ).reset_index(name="Fee")
         activity_agg = pd.merge(activity_agg, fee_by_activity, on="activity_tag")
     else:
         activity_agg["Fee"] = 0
-    
+
     # Add cost
     if "cost_record" in df.columns:
-        cost_by_activity = df.groupby("activity_tag")["cost_record"].sum().reset_index(name="Total cost")
+        cost_by_activity = df.groupby("activity_tag", dropna=False)["cost_record"].sum().reset_index(name="Total cost")
         activity_agg = pd.merge(activity_agg, cost_by_activity, on="activity_tag")
     else:
         activity_agg["Total cost"] = 0
-    
+
     # Add profit
     if "profit_record" in df.columns:
-        profit_by_activity = df.groupby("activity_tag")["profit_record"].sum().reset_index(name="Total profit")
+        profit_by_activity = df.groupby("activity_tag", dropna=False)["profit_record"].sum().reset_index(name="Total profit")
         activity_agg = pd.merge(activity_agg, profit_by_activity, on="activity_tag")
     else:
         activity_agg["Total profit"] = 0
@@ -887,39 +905,42 @@ def aggregate_by_person(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         Dataframe with person aggregations
     """
-    person_agg = df.groupby(["person_name"]).agg({
+    person_agg = df.groupby(["person_name"], dropna=False).agg({
         "hours_used": "sum",
         "hours_billable": "sum",
         "project_number": "nunique"
     }).reset_index()
-    
+
+    # Replace NaN person_name values with "Unknown Person" for display
+    person_agg["person_name"] = person_agg["person_name"].fillna("Unknown Person")
+
     person_agg["Non-billable hours"] = person_agg["hours_used"] - person_agg["hours_billable"]
     person_agg["Billability %"] = (person_agg["hours_billable"] / person_agg["hours_used"] * 100).round(2)
     person_agg.rename(columns={"project_number": "Number of projects"}, inplace=True)
-    
+
     # Add fee (new approach with fallback)
     if "fee_record" in df.columns:
-        fee_by_person = df.groupby("person_name")["fee_record"].sum().reset_index(name="Fee")
+        fee_by_person = df.groupby("person_name", dropna=False)["fee_record"].sum().reset_index(name="Fee")
         person_agg = pd.merge(person_agg, fee_by_person, on="person_name")
     elif "billable_rate_record" in df.columns:
         # Fallback to old calculation
-        fee_by_person = df.groupby("person_name").apply(
+        fee_by_person = df.groupby("person_name", dropna=False).apply(
             lambda x: (x["hours_billable"] * x["billable_rate_record"]).sum()
         ).reset_index(name="Fee")
         person_agg = pd.merge(person_agg, fee_by_person, on="person_name")
     else:
         person_agg["Fee"] = 0
-    
+
     # Add cost
     if "cost_record" in df.columns:
-        cost_by_person = df.groupby("person_name")["cost_record"].sum().reset_index(name="Total cost")
+        cost_by_person = df.groupby("person_name", dropna=False)["cost_record"].sum().reset_index(name="Total cost")
         person_agg = pd.merge(person_agg, cost_by_person, on="person_name")
     else:
         person_agg["Total cost"] = 0
-    
+
     # Add profit
     if "profit_record" in df.columns:
-        profit_by_person = df.groupby("person_name")["profit_record"].sum().reset_index(name="Total profit")
+        profit_by_person = df.groupby("person_name", dropna=False)["profit_record"].sum().reset_index(name="Total profit")
         person_agg = pd.merge(person_agg, profit_by_person, on="person_name")
     else:
         person_agg["Total profit"] = 0
