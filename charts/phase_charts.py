@@ -41,6 +41,13 @@ def render_phase_tab(filtered_df, aggregate_by_phase, render_chart, get_category
     # Get available phase tag columns
     available_tags = get_phase_tag_columns(filtered_df)
 
+    # Filter out columns that are completely empty (all null/NaN or empty strings)
+    available_tags = [
+        col for col in available_tags
+        if filtered_df[col].notna().any() and
+           (filtered_df[col].astype(str).str.strip() != '').any()
+    ]
+
     if not available_tags:
         st.warning("Phase tag information is not available in the data.")
         return

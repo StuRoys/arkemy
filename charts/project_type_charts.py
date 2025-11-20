@@ -40,6 +40,13 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
     # Get available project tag columns only
     available_tags = get_project_tag_columns_only(filtered_df)
 
+    # Filter out columns that are completely empty (all null/NaN or empty strings)
+    available_tags = [
+        col for col in available_tags
+        if filtered_df[col].notna().any() and
+           (filtered_df[col].astype(str).str.strip() != '').any()
+    ]
+
     if not available_tags:
         st.warning("Project tag information is not available in the data.")
         return
