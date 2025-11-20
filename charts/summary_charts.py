@@ -600,12 +600,12 @@ def get_project_type_insights(df: pd.DataFrame, top_n: int = 3) -> Dict[str, Any
     Returns:
         Dictionary with project type insights
     """
-    from utils.processors import get_project_tag_columns, aggregate_by_project_tag
+    from utils.processors import get_all_tag_columns, aggregate_by_project_tag
 
     insights = {}
 
     # Check if dataframe is empty or lacks necessary columns
-    available_tags = get_project_tag_columns(df)
+    available_tags = get_all_tag_columns(df)
     if df.empty or not available_tags:
         return insights
 

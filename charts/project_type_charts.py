@@ -5,7 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from utils.chart_helpers import create_standardized_customdata
 from utils.chart_styles import get_metric_options, initialize_analytics_metric_state
-from utils.processors import get_project_tag_columns, aggregate_by_project_tag, get_project_tag_columns_with_labels
+from utils.processors import get_all_tag_columns, get_project_tag_columns, aggregate_by_project_tag, get_project_tag_columns_with_labels
 from utils.tag_manager import get_tag_display_name
 
 def get_widget_key(base_key: str, nav_context: str = "project_types") -> str:
@@ -23,8 +23,8 @@ def render_project_type_tab(filtered_df, aggregate_by_project_type, render_chart
         render_chart: Function to render charts with consistent styling
         get_category_colors: Function to get consistent color schemes
     """
-    # Get available project tag columns
-    available_tags = get_project_tag_columns(filtered_df)
+    # Get available tag columns (project, phase, activity, record)
+    available_tags = get_all_tag_columns(filtered_df)
 
     if not available_tags:
         st.warning("Project tag information is not available in the data.")

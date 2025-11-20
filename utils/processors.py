@@ -37,8 +37,57 @@ def add_percentage_columns(df: pd.DataFrame, sum_metrics: List[str]) -> pd.DataF
     return result_df
 
 
+def get_all_tag_columns(df: pd.DataFrame) -> list:
+    """
+    Detect tag columns with specific prefixes.
+    Matches columns starting with: project_tag*, phase_tag*, activity_tag*, record_tag*
+
+    Args:
+        df: DataFrame to search
+
+    Returns:
+        List of tag column names, sorted by prefix groups then index
+        Example: ['activity_tag_1', 'phase_tag_1', 'phase_tag_2', 'project_tag_1', 'project_tag_2', 'record_tag_1']
+    """
+    # Whitelist of allowed tag prefixes
+    allowed_prefixes = ['project_tag', 'phase_tag', 'activity_tag', 'record_tag']
+
+    tag_cols = []
+
+    for col in df.columns:
+        # Check if column starts with any allowed prefix
+        for prefix in allowed_prefixes:
+            if col.startswith(prefix):
+                tag_cols.append(col)
+                break  # Don't check other prefixes
+
+    # Sort by prefix groups, then by index
+    def sort_key(col):
+        for prefix in allowed_prefixes:
+            if col.startswith(prefix):
+                # Extract what comes after the prefix
+                remainder = col[len(prefix):]
+                if remainder == '':
+                    # Just 'project_tag' with no suffix
+                    return (prefix, 0, col)
+                elif remainder.startswith('_'):
+                    # 'project_tag_1' or 'project_tag_2'
+                    try:
+                        index = int(remainder[1:])
+                        return (prefix, index, col)
+                    except ValueError:
+                        return (prefix, 0, col)
+        return (col, 999, col)  # Fallback
+
+    sorted_cols = sorted(tag_cols, key=sort_key)
+    return sorted_cols
+
+
 def get_project_tag_columns(df: pd.DataFrame) -> list:
     """
+    DEPRECATED: Use get_all_tag_columns() instead.
+    Kept for backward compatibility.
+
     Detect all project tag columns in the dataframe.
     Handles both 'project_tag' (legacy) and 'project_tag_*' (indexed) patterns.
 
@@ -48,27 +97,7 @@ def get_project_tag_columns(df: pd.DataFrame) -> list:
     Returns:
         List of tag column names in order: ['project_tag', 'project_tag_1', 'project_tag_2', ...]
     """
-    tag_cols = []
-
-    # Check for legacy 'project_tag' first
-    if 'project_tag' in df.columns:
-        tag_cols.append('project_tag')
-
-    # Check for indexed 'project_tag_1', 'project_tag_2', etc.
-    indexed_pattern = r"^project_tag_(\d+)$"
-    indexed_cols = []
-
-    for col in df.columns:
-        match = re.match(indexed_pattern, col)
-        if match:
-            index = int(match.group(1))
-            indexed_cols.append((index, col))
-
-    # Sort by index number and append
-    indexed_cols.sort(key=lambda x: x[0])
-    tag_cols.extend([col for _, col in indexed_cols])
-
-    return tag_cols
+    return get_all_tag_columns(df)
 
 
 def get_project_tag_columns_with_labels(df: pd.DataFrame, tag_mappings: Dict[str, str] = None) -> Dict[str, str]:
